@@ -3,6 +3,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { formatDetectionWorkflow, FormatDetectionResult } from './format-detection-workflow';
 
+// Use require for pdf-parse to avoid TypeScript import issues
+const pdfParse = require('pdf-parse');
+
 // Load environment variables
 require('dotenv').config();
 
@@ -295,6 +298,9 @@ class AIService {
         console.warn('⚠️  Could not read file content:', error);
         content = '';
       }
+    } else if (this.isPdfFile(fileExtension)) {
+      // Extract PDF content
+      content = await this.extractPdfContent(filePath);
     }
 
     return {
@@ -320,6 +326,33 @@ class AIService {
       '.css',
     ];
     return textExtensions.includes(extension);
+  }
+
+  private isPdfFile(extension: string): boolean {
+    return extension.toLowerCase() === '.pdf';
+  }
+
+  private async extractPdfContent(filePath: string): Promise<string> {
+    try {
+      console.log('📄 Extracting PDF content from:', path.basename(filePath));
+      
+      const dataBuffer = fs.readFileSync(filePath);
+      const pdfData = await pdfParse(dataBuffer);
+      
+      // Limit content to 3000 characters (more than text files since PDFs can be longer)
+      const content = pdfData.text.substring(0, 3000);
+      
+      console.log('✅ PDF content extracted:', {
+        totalPages: pdfData.numpages,
+        contentLength: pdfData.text.length,
+        truncatedLength: content.length
+      });
+      
+      return content;
+    } catch (error) {
+      console.warn('⚠️ Failed to extract PDF content:', error);
+      return '';
+    }
   }
 
   private async performContentAnalysis(
@@ -354,7 +387,7 @@ class AIService {
   private buildAnalysisPrompt(metadata: FileMetadata): string {
     const { originalName, fileExtension, fileSize, content } = metadata;
 
-    return `You are a smart file organizer. Analyze this file and suggest a better, descriptive filename.
+    return `You are a smart file organizer. Analyze the ACTUAL CONTENT of this file and suggest a better, descriptive filename. IGNORE misleading filenames - focus on what the content actually contains.
 
 File Information:
 - Current name: ${originalName}
@@ -362,20 +395,29 @@ File Information:
 - File size: ${fileSize} bytes
 - Content preview: ${content ? content.substring(0, 500) : 'No content available'}
 
+CONTENT-BASED ANALYSIS RULES:
+1. If content contains "Professional Summary", "Experience", "Education", "Skills" → category: "resume"
+2. If content contains "Invoice", "Bill To", "Amount Due", "Payment" → category: "invoice"
+3. If content contains "Executive Summary", "Analysis", "Findings", "Report" → category: "report"
+4. If content contains function, class, import, code patterns → category: "code"
+5. If content contains meeting notes, agenda, minutes → category: "meeting-notes"
+6. If filename is misleading compared to content, IGNORE the filename completely
+
 Requirements:
-1. Suggest a clear, descriptive filename (keep the original extension)
-2. Use only alphanumeric characters, hyphens, and underscores
-3. Keep filename under 100 characters
-4. Categorize the file (document, image, code, data, etc.)
-5. Provide confidence score (0.0-1.0)
-6. Explain your reasoning
+1. Analyze CONTENT first, filename second
+2. Suggest filename based on ACTUAL content, not misleading names
+3. Use specific categories: resume, invoice, report, code, meeting-notes, contract, proposal, etc.
+4. Use only alphanumeric characters, hyphens, and underscores
+5. Keep filename under 100 characters
+6. Provide confidence score (0.0-1.0)
+7. If content clearly contradicts filename, mention this in reasoning
 
 Respond in this exact JSON format:
 {
-  "suggestedName": "descriptive-filename${fileExtension}",
+  "suggestedName": "descriptive-filename-based-on-content${fileExtension}",
   "confidence": 0.85,
-  "category": "document",
-  "reasoning": "Brief explanation of why this name was chosen"
+  "category": "specific-category-based-on-content",
+  "reasoning": "Brief explanation focusing on content analysis and any filename conflicts"
 }
 
 Only respond with valid JSON, no additional text.`;

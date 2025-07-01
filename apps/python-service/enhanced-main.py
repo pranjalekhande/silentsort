@@ -210,31 +210,65 @@ def generate_technical_tags(content: str, entities: Dict[str, Any]) -> List[str]
     return tags
 
 def determine_category(content: str, entities: Dict[str, Any]) -> tuple[str, str]:
-    """Determine domain-specific category and subcategory"""
+    """Determine domain-specific category and subcategory with content-first analysis"""
     content_lower = content.lower()
     
-    # Project proposal detection (higher priority)
+    # RESUME DETECTION (HIGHEST PRIORITY - should override misleading filenames)
+    resume_indicators = [
+        'professional summary', 'work experience', 'education', 'technical skills',
+        'employment history', 'career objective', 'achievements', 'certifications',
+        'software engineer', 'years of experience', 'bachelor', 'master', 'degree',
+        'programming languages', 'frameworks', 'databases', 'contact information'
+    ]
+    resume_score = sum(1 for indicator in resume_indicators if indicator in content_lower)
+    
+    # Strong resume detection (3+ indicators = definitely a resume)
+    if resume_score >= 3:
+        if any('software' in tech.lower() or 'engineer' in content_lower for tech in entities.get('technology', [])):
+            return "resume", "software-engineer"
+        return "resume", "professional"
+    
+    # Medium resume detection (2 indicators = likely resume, especially if filename is misleading)
+    if resume_score >= 2:
+        return "resume", "professional"
+    
+    # Project proposal detection (high priority)
     if 'project proposal' in content_lower or 'proposal:' in content_lower:
         if any('ai' in tech.lower() for tech in entities.get('technology', [])):
             return "project-proposal", "ai-development"
         return "project-proposal", "software-development"
     
-    # Invoice detection (secondary priority)
-    if ('invoice:' in content_lower or 'invoice #' in content_lower or 
-        content_lower.startswith('invoice ')) and not 'proposal' in content_lower:
+    # REAL Invoice detection (check for actual invoice content, not just filename)
+    invoice_content_indicators = [
+        'bill to', 'amount due', 'payment terms', 'invoice date', 'due date',
+        'subtotal', 'tax amount', 'total amount', 'payment method', 'vendor',
+        'line items', 'quantity', 'unit price', 'description'
+    ]
+    invoice_score = sum(1 for indicator in invoice_content_indicators if indicator in content_lower)
+    
+    # Only classify as invoice if content actually looks like an invoice (2+ indicators)
+    if invoice_score >= 2:
         return "invoice", "vendor-invoice"
     
     # Meeting notes detection
-    if 'meeting' in content_lower or 'standup' in content_lower:
+    if 'meeting' in content_lower or 'standup' in content_lower or 'agenda' in content_lower:
         return "meeting-notes", "team-meeting"
     
     # Report detection
-    if 'report' in content_lower:
+    if ('report' in content_lower and 'executive summary' in content_lower) or 'findings' in content_lower:
         if 'quarterly' in content_lower:
             return "report", "quarterly-report"
         return "report", "business-report"
     
-    # Default fallback
+    # Contract/Legal document detection
+    if any(term in content_lower for term in ['contract', 'agreement', 'terms and conditions', 'legal']):
+        return "contract", "legal-document"
+    
+    # Code documentation detection
+    if any(term in content_lower for term in ['function', 'class', 'import', 'def ', 'const ', 'var ']):
+        return "code", "documentation"
+    
+    # Default fallback (when content doesn't clearly indicate specific type)
     return "document", "general"
 
 def generate_smart_filename(content: str, entities: Dict[str, Any], category: str, original_extension: str) -> str:
@@ -243,8 +277,60 @@ def generate_smart_filename(content: str, entities: Dict[str, Any], category: st
     parts = []
     content_lower = content.lower()
     
-    # Start with document type based on content analysis
-    if category == "project-proposal":
+    # Start with document type based on content analysis (IGNORE MISLEADING FILENAMES)
+    if category == "resume":
+        parts.append("resume")
+        
+        # Extract person's name from content
+        name_patterns = [
+            r'\b([A-Z][a-z]+ [A-Z][a-z]+)\b',  # First Last
+            r'\b([A-Z][A-Z]+ [A-Z][a-z]+)\b',  # FIRST Last  
+            r'^([A-Z][a-z]+ [A-Z][a-z]+)',     # At start of content
+        ]
+        
+        person_name = None
+        for pattern in name_patterns:
+            match = re.search(pattern, content)
+            if match:
+                name = match.group(1)
+                # Avoid common false positives
+                if not any(word in name.lower() for word in ['professional', 'technical', 'work', 'experience', 'software']):
+                    person_name = name.lower().replace(' ', '-')
+                    break
+        
+        if person_name:
+            parts.append(person_name)
+        
+        # Add profession/role
+        if 'software engineer' in content_lower:
+            parts.append('software-engineer')
+        elif 'data scientist' in content_lower:
+            parts.append('data-scientist')
+        elif 'developer' in content_lower:
+            parts.append('developer')
+        elif 'engineer' in content_lower:
+            parts.append('engineer')
+        
+        # Add key technology
+        if entities.get('technology'):
+            main_tech = entities['technology'][0].lower().replace(' ', '-').replace('machine-learning', 'ml')
+            parts.append(main_tech)
+        
+        # Add experience level if found
+        experience_patterns = [
+            r'(\d+)\+?\s*years?\s*of\s*experience',
+            r'(\d+)\+?\s*years?\s*experience',
+            r'(\d+)\+?\s*yrs?\s*experience'
+        ]
+        for pattern in experience_patterns:
+            match = re.search(pattern, content_lower)
+            if match:
+                years = int(match.group(1))
+                if 1 <= years <= 20:  # Reasonable range
+                    parts.append(f"{years}yrs")
+                break
+    
+    elif category == "project-proposal":
         parts.append("project-proposal")
         
         # Add main technology focus

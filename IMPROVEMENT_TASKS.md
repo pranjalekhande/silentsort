@@ -28,19 +28,47 @@
 - **Features**: Processing states, progress indicators, "NEED REVIEW" counter
 - **UI**: Status badges, approve/reject buttons, real-time updates
 
+### 5. **🔍 Implement Real File Content Analysis** - **HIGH PRIORITY**
+- **Problem**: Currently only analyzes filenames and extensions, not actual file content
+- **Current Limitation**: 
+  - Images: No OCR or image recognition
+  - PDFs: No text extraction from PDF content
+  - Documents: Limited content preview (first 2000 chars only)
+- **Improvement**: Add comprehensive file content analysis
+- **Implementation**:
+  - **PDF Text Extraction**: Use `pdf-parse` or similar to extract full text content
+  - **Image OCR**: Integrate OCR service (Tesseract.js or cloud OCR API)
+  - **Document Analysis**: Full content analysis for Word, Excel, PowerPoint files
+  - **Image Recognition**: Use AI vision models to identify image content/context
+  - **Metadata Extraction**: Extract EXIF data, document properties, creation dates
+- **Benefits**:
+  - More accurate categorization based on actual content
+  - Better naming suggestions reflecting file contents
+  - Context-aware organization (extract dates, companies, projects from content)
+  - Higher confidence scores for content-based analysis
+- **Files to Modify**: 
+  - `apps/desktop/src/services/ai-service.ts` - enhance `extractFileMetadata()`
+  - Add new content extraction services for different file types
+- **Dependencies**: 
+  - `pdf-parse` for PDF text extraction
+  - `tesseract.js` for OCR
+  - `mammoth` for Word document extraction
+  - `exceljs` for Excel file analysis
+- **Priority**: **CRITICAL** - This is the foundation for intelligent file processing
+
 ## ⚡ **MEDIUM PRIORITY - Enhance Functionality**
 
-### 5. **Batch File Processing**
+### 6. **Batch File Processing**
 - **Current**: One file at a time
 - **Improvement**: Process multiple files efficiently
 - **Implementation**: Queue system with rate limiting
 
-### 6. **User Approval Workflow**
+### 7. **User Approval Workflow**
 - **Add**: Accept/Reject buttons for AI suggestions
 - **Feature**: One-click rename with suggested name
 - **Feature**: Edit suggestions before applying
 
-### 7. **Dynamic Contextual Folder Organization**
+### 8. **Dynamic Contextual Folder Organization**
 - **Enhanced**: AI-driven dynamic folder creation based on content analysis
 - **Approach**: Use existing entity extraction (company, project, tech, time) to create contextual folders
 - **Scope**: Only within monitored directory (`~/Downloads/silentsort-test/`)
@@ -58,7 +86,7 @@
 - **UI Integration**: Show recommended folder path with approve/move buttons
 - **Fallback**: Default categories if context can't be determined
 
-### 8. **Confidence Score Tuning**
+### 9. **Confidence Score Tuning**
 - **Current**: All files showing 0.9 confidence
 - **Improvement**: More nuanced scoring based on:
   - Content quality
@@ -67,40 +95,40 @@
 
 ## 🎯 **LOW PRIORITY - Nice to Have**
 
-### 9. **Performance Monitoring**
+### 10. **Performance Monitoring**
 - **Add**: Processing time tracking
 - **Add**: Success/failure rates
 - **Add**: Performance dashboard
 
-### 10. **Advanced AI Features**
+### 11. **Advanced AI Features**
 - **Add**: LangGraph workflows (when dependencies work)
 - **Add**: Multi-step analysis pipeline
 - **Add**: Learning from user corrections
 
-### 11. **Settings & Configuration**
+### 12. **Settings & Configuration**
 - **Add**: User preferences panel
 - **Add**: Custom AI prompts
 - **Add**: Folder watch configuration
 - **Add**: Processing rules and filters
 
-### 12. **File History & Undo**
+### 13. **File History & Undo**
 - **Add**: Rename history tracking
 - **Add**: Undo functionality
 - **Add**: Bulk operations log
 
 ## 🛠️ **TECHNICAL IMPROVEMENTS**
 
-### 13. **Error Handling & Logging**
+### 14. **Error Handling & Logging**
 - **Improve**: Better error messages
 - **Add**: Structured logging
 - **Add**: Error recovery mechanisms
 
-### 14. **Testing & Quality**
+### 15. **Testing & Quality**
 - **Add**: Automated UI tests
 - **Add**: AI service integration tests
 - **Add**: Performance benchmarks
 
-### 15. **Production Readiness**
+### 16. **Production Readiness**
 - **Add**: App signing for macOS
 - **Add**: Auto-updater
 - **Add**: Crash reporting
@@ -117,12 +145,16 @@ Based on logs:
 
 ## 🎯 **Recommended Next Steps**
 
-1. **Fix timeouts** (5 minutes) - Quick win
-2. **Add AI results to UI** (30 minutes) - High impact
-3. **Add approve/reject buttons** (20 minutes) - Core workflow
-4. **Implement file processing cache** (15 minutes) - Prevents duplicates
+1. **✅ Fix timeouts** (5 minutes) - COMPLETED
+2. **✅ Add AI results to UI** (30 minutes) - COMPLETED
+3. **✅ Add approve/reject buttons** (20 minutes) - COMPLETED
+4. **✅ Implement file processing cache** (15 minutes) - COMPLETED
+5. **🔍 Implement File Content Analysis** (2-3 hours) - **HIGH PRIORITY**
+   - Start with PDF text extraction using `pdf-parse`
+   - Add basic OCR for images with `tesseract.js`
+   - Enhance content-based categorization and naming
 
-Total time for major improvements: ~70 minutes
+Total time for next major improvement: ~2-3 hours (high impact)
 
 ## 🚀 **Success Metrics to Track**
 
