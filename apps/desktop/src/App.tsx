@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
+interface ExtractedEntities {
+  budget?: string;
+  team_size?: string;
+  deadline?: string;
+  technology: string[];
+  company?: string;
+  invoice_number?: string;
+  amount?: string;
+}
+
 interface FileProcessingItem {
   id: string;
   originalPath: string;
@@ -8,8 +18,12 @@ interface FileProcessingItem {
   suggestedName: string;
   confidence: number;
   category: string;
+  subcategory?: string;
   reasoning: string;
   status: 'pending' | 'approved' | 'rejected' | 'processing';
+  technical_tags?: string[];
+  extracted_entities?: ExtractedEntities;
+  processing_time_ms?: number;
   error?: string;
 }
 
@@ -106,7 +120,7 @@ const App: React.FC = () => {
     const fileName = filePath.split('/').pop() || 'Unknown file';
     const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Add file with AI results already processed
+    // Add file with Enhanced AI results already processed
     const newFile: FileProcessingItem = {
       id: fileId,
       originalPath: filePath,
@@ -114,8 +128,12 @@ const App: React.FC = () => {
       suggestedName: aiResult.suggestedName,
       confidence: aiResult.confidence,
       category: aiResult.category,
+      subcategory: aiResult.subcategory,
       reasoning: aiResult.reasoning,
       status: aiResult.error ? 'rejected' : 'pending',
+      technical_tags: aiResult.technical_tags || [],
+      extracted_entities: aiResult.extracted_entities || { technology: [] },
+      processing_time_ms: aiResult.processing_time_ms,
       error: aiResult.error,
     };
 
@@ -146,18 +164,23 @@ const App: React.FC = () => {
       // Process file with AI
       const result = await window.electronAPI.processFileContent(filePath);
 
-      // Update file with AI suggestion
+      // Update file with Enhanced AI suggestion
+      const enhancedResult = result as any; // Type assertion for enhanced fields
       setFiles(prev =>
         prev.map(file =>
           file.id === fileId
             ? {
                 ...file,
-                suggestedName: result.suggestedName,
-                confidence: result.confidence,
-                category: result.category,
-                reasoning: result.reasoning,
-                error: result.error,
-                status: result.error ? 'rejected' : 'pending',
+                suggestedName: enhancedResult.suggestedName,
+                confidence: enhancedResult.confidence,
+                category: enhancedResult.category,
+                subcategory: enhancedResult.subcategory,
+                reasoning: enhancedResult.reasoning,
+                technical_tags: enhancedResult.technical_tags || [],
+                extracted_entities: enhancedResult.extracted_entities || { technology: [] },
+                processing_time_ms: enhancedResult.processing_time_ms,
+                error: enhancedResult.error,
+                status: enhancedResult.error ? 'rejected' : 'pending',
               }
             : file
         )
@@ -214,12 +237,35 @@ const App: React.FC = () => {
     );
   };
 
-  const filteredFiles = files.filter(
-    file =>
-      file.originalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      file.suggestedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      file.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredFiles = files.filter(file => {
+    const searchLower = searchQuery.toLowerCase();
+    
+    // Basic file name and category search
+    const basicMatch = 
+      file.originalName.toLowerCase().includes(searchLower) ||
+      file.suggestedName.toLowerCase().includes(searchLower) ||
+      file.category.toLowerCase().includes(searchLower) ||
+      (file.subcategory && file.subcategory.toLowerCase().includes(searchLower));
+    
+    // Technical tags search
+    const tagsMatch = file.technical_tags?.some(tag => 
+      tag.toLowerCase().includes(searchLower)
+    ) || false;
+    
+    // Extracted entities search
+    const entitiesMatch = file.extracted_entities && (
+      (file.extracted_entities.budget && file.extracted_entities.budget.toLowerCase().includes(searchLower)) ||
+      (file.extracted_entities.team_size && file.extracted_entities.team_size.toLowerCase().includes(searchLower)) ||
+      (file.extracted_entities.deadline && file.extracted_entities.deadline.toLowerCase().includes(searchLower)) ||
+      (file.extracted_entities.company && file.extracted_entities.company.toLowerCase().includes(searchLower)) ||
+      (file.extracted_entities.invoice_number && file.extracted_entities.invoice_number.toLowerCase().includes(searchLower)) ||
+      (file.extracted_entities.technology && file.extracted_entities.technology.some(tech => 
+        tech.toLowerCase().includes(searchLower)
+      ))
+    ) || false;
+    
+    return basicMatch || tagsMatch || entitiesMatch;
+  });
 
   return (
     <div className='app'>
@@ -300,9 +346,61 @@ const App: React.FC = () => {
                 <div className='file-category'>
                   <strong>Category:</strong>{' '}
                   <span className='category-tag'>{file.category}</span>
+                  {file.subcategory && (
+                    <span className='subcategory-tag'> → {file.subcategory}</span>
+                  )}
                 </div>
+
+                {/* Technical Tags Display */}
+                {file.technical_tags && file.technical_tags.length > 0 && (
+                  <div className='technical-tags'>
+                    <strong>Technical Tags:</strong>
+                    <div className='tags-container'>
+                      {file.technical_tags.map((tag, index) => (
+                        <span key={index} className='tech-tag'>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Extracted Entities Display */}
+                {file.extracted_entities && (
+                  <div className='extracted-entities'>
+                    <strong>Extracted Data:</strong>
+                    <div className='entities-grid'>
+                      {file.extracted_entities.budget && (
+                        <span className='entity budget'>💰 {file.extracted_entities.budget}</span>
+                      )}
+                      {file.extracted_entities.team_size && (
+                        <span className='entity team'>👥 {file.extracted_entities.team_size}</span>
+                      )}
+                      {file.extracted_entities.deadline && (
+                        <span className='entity deadline'>📅 {file.extracted_entities.deadline}</span>
+                      )}
+                      {file.extracted_entities.company && (
+                        <span className='entity company'>🏢 {file.extracted_entities.company}</span>
+                      )}
+                      {file.extracted_entities.invoice_number && (
+                        <span className='entity invoice'>📄 {file.extracted_entities.invoice_number}</span>
+                      )}
+                      {file.extracted_entities.technology && file.extracted_entities.technology.length > 0 && (
+                        <span className='entity technology'>
+                          🔧 {file.extracted_entities.technology.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className='file-reasoning'>
                   <strong>AI Reasoning:</strong> <em>{file.reasoning}</em>
+                  {file.processing_time_ms && (
+                    <span className='processing-time'>
+                      {' '}(Processed in {file.processing_time_ms}ms)
+                    </span>
+                  )}
                 </div>
                 {file.error && (
                   <div className='file-error'>

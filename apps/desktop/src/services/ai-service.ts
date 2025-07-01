@@ -5,13 +5,27 @@ import * as path from 'path';
 // Load environment variables
 require('dotenv').config();
 
+export interface ExtractedEntities {
+  budget?: string;
+  team_size?: string;
+  deadline?: string;
+  technology: string[];
+  company?: string;
+  invoice_number?: string;
+  amount?: string;
+}
+
 export interface FileAnalysisResult {
   suggestedName: string;
   confidence: number;
   category: string;
+  subcategory?: string;
   reasoning: string;
   alternatives?: string[];
   contentSummary?: string;
+  technical_tags?: string[];
+  extracted_entities?: ExtractedEntities;
+  processing_time_ms?: number;
   error?: string;
 }
 
@@ -71,8 +85,8 @@ interface NameGenerationResult {
 class AIService {
   private openai: OpenAI | null = null;
   private isConfigured: boolean = false;
-  private usePythonService: boolean = true; // Use Python LangGraph service
-  private pythonServiceUrl: string = 'http://127.0.0.1:8000';
+  private usePythonService: boolean = true; // Use Enhanced Python service
+  private pythonServiceUrl: string = 'http://127.0.0.1:8002';
 
   constructor() {
     this.initializeOpenAI();
@@ -221,14 +235,18 @@ class AIService {
       
       const result = await response.json();
       
-      // Convert Python service response to our format
+      // Convert Enhanced Python service response to our format
       return {
         suggestedName: result.suggested_name,
         confidence: result.confidence,
         category: result.category,
+        subcategory: result.subcategory,
         reasoning: result.reasoning,
         alternatives: result.alternatives || [],
         contentSummary: result.content_summary,
+        technical_tags: result.technical_tags || [],
+        extracted_entities: result.extracted_entities || { technology: [] },
+        processing_time_ms: result.processing_time_ms,
       };
       
     } catch (error) {

@@ -47,7 +47,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=True,  
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -562,9 +562,9 @@ async def root():
 if __name__ == "__main__":
     # Development server
     uvicorn.run(
-        "main:app",
+        "langgraph-main:app",
         host="127.0.0.1",
-        port=8000,
+        port=8001,  # Different port for testing
         reload=True,
         log_level="info"
     ) 
