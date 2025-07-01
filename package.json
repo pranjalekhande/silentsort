@@ -1,0 +1,19 @@
+{
+  "name": "silentsort",
+  "version": "1.0.0",
+  "description": "AI-powered file organization desktop application for macOS",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cd apps/desktop && npm run dev",
+    "build": "cd apps/desktop && npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install:all": "npm install && cd apps/desktop && npm install"
+  },
+  "keywords": ["electron", "ai", "file-organization", "macos", "productivity"],
+  "author": "pranjalekhande",
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
