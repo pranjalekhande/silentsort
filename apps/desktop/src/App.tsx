@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import { FileReviewCard } from './components';
 
 interface ExtractedEntities {
   budget?: string;
@@ -238,11 +239,15 @@ const App: React.FC = () => {
     }
   };
 
-  const handleApproveRename = async (file: FileProcessingItem) => {
+  const handleApproveRename = async (fileId: string, finalName?: string) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) return;
     try {
+      // Use the edited name if provided, otherwise use the suggested name
+      const nameToUse = finalName || file.suggestedName;
       const newPath = file.originalPath.replace(
         file.originalName,
-        file.suggestedName
+        nameToUse
       );
       const result = await window.electronAPI.renameFile(
         file.originalPath,
@@ -252,9 +257,17 @@ const App: React.FC = () => {
       if (result.success) {
         setFiles(prev =>
           prev.map(f =>
-            f.id === file.id ? { ...f, status: 'approved' as const } : f
+            f.id === file.id ? { 
+              ...f, 
+              status: 'approved' as const,
+              suggestedName: nameToUse // Update the displayed name to the final used name
+            } : f
           )
         );
+        console.log('✅ File renamed successfully:', file.originalName, '→', nameToUse);
+      } else {
+        console.error('❌ File rename failed:', result.error);
+        // You could add error handling here to show the user what went wrong
       }
     } catch (error) {
       console.error('Error renaming file:', error);
@@ -388,116 +401,40 @@ const App: React.FC = () => {
             </p>
           </div>
         ) : (
-          filteredFiles.map(file => (
-            <div key={file.id} className={`file-item ${file.status}`}>
-              <div className='file-info'>
-                <div className='original-name'>
-                  <strong>Original:</strong> {file.originalName}
-                </div>
-                <div className='suggested-name'>
-                  <strong>Suggested:</strong> {file.suggestedName}
-                  {file.confidence > 0 && (
-                    <span className='confidence'>
-                      ({Math.round(file.confidence * 100)}% confident)
-                    </span>
-                  )}
-                </div>
-                <div className='file-category'>
-                  <strong>Category:</strong>{' '}
-                  <span className='category-tag'>{file.category}</span>
-                  {file.subcategory && (
-                    <span className='subcategory-tag'> → {file.subcategory}</span>
-                  )}
-                </div>
-
-                {/* Technical Tags Display */}
-                {file.technical_tags && file.technical_tags.length > 0 && (
-                  <div className='technical-tags'>
-                    <strong>Technical Tags:</strong>
-                    <div className='tags-container'>
-                      {file.technical_tags.map((tag, index) => (
-                        <span key={index} className='tech-tag'>
-                          {tag}
-                        </span>
-                      ))}
+          filteredFiles.map(file => {
+            if (file.status === 'pending') {
+              return (
+                <FileReviewCard
+                  key={file.id}
+                  file={file}
+                  onApprove={handleApproveRename}
+                  onReject={handleRejectRename}
+                />
+              );
+            } else {
+              // Show approved/rejected files in a simple format
+              return (
+                <div key={file.id} className={`file-item ${file.status}`}>
+                  <div className='file-info'>
+                    <div className='original-name'>
+                      <strong>Original:</strong> {file.originalName}
+                    </div>
+                    <div className='suggested-name'>
+                      <strong>Final Name:</strong> {file.suggestedName}
                     </div>
                   </div>
-                )}
 
-                {/* Extracted Entities Display */}
-                {file.extracted_entities && (
-                  <div className='extracted-entities'>
-                    <strong>Extracted Data:</strong>
-                    <div className='entities-grid'>
-                      {file.extracted_entities.budget && (
-                        <span className='entity budget'>💰 {file.extracted_entities.budget}</span>
-                      )}
-                      {file.extracted_entities.team_size && (
-                        <span className='entity team'>👥 {file.extracted_entities.team_size}</span>
-                      )}
-                      {file.extracted_entities.deadline && (
-                        <span className='entity deadline'>📅 {file.extracted_entities.deadline}</span>
-                      )}
-                      {file.extracted_entities.company && (
-                        <span className='entity company'>🏢 {file.extracted_entities.company}</span>
-                      )}
-                      {file.extracted_entities.invoice_number && (
-                        <span className='entity invoice'>📄 {file.extracted_entities.invoice_number}</span>
-                      )}
-                      {file.extracted_entities.technology && file.extracted_entities.technology.length > 0 && (
-                        <span className='entity technology'>
-                          🔧 {file.extracted_entities.technology.join(', ')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
+                  {file.status === 'approved' && (
+                    <div className='status-indicator approved'>Renamed ✓</div>
+                  )}
 
-                <div className='file-reasoning'>
-                  <strong>AI Reasoning:</strong> <em>{file.reasoning}</em>
-                  {file.processing_time_ms && (
-                    <span className='processing-time'>
-                      {' '}(Processed in {file.processing_time_ms}ms)
-                    </span>
+                  {file.status === 'rejected' && (
+                    <div className='status-indicator rejected'>Skipped</div>
                   )}
                 </div>
-                {file.error && (
-                  <div className='file-error'>
-                    <strong>Error:</strong>{' '}
-                    <span className='error-text'>{file.error}</span>
-                  </div>
-                )}
-                <div className='file-path'>
-                  <small>{file.originalPath}</small>
-                </div>
-              </div>
-
-              {file.status === 'pending' && (
-                <div className='file-actions'>
-                  <button
-                    onClick={() => handleApproveRename(file)}
-                    className='approve-btn'
-                  >
-                    ✓ Approve
-                  </button>
-                  <button
-                    onClick={() => handleRejectRename(file.id)}
-                    className='reject-btn'
-                  >
-                    ✗ Reject
-                  </button>
-                </div>
-              )}
-
-              {file.status === 'approved' && (
-                <div className='status-indicator approved'>Renamed ✓</div>
-              )}
-
-              {file.status === 'rejected' && (
-                <div className='status-indicator rejected'>Skipped</div>
-              )}
-            </div>
-          ))
+              );
+            }
+          })
         )}
       </div>
     </div>

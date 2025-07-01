@@ -25,7 +25,7 @@ interface FileReviewCardProps {
     processing_time_ms?: number;
     error?: string;
   };
-  onApprove: (fileId: string) => void;
+  onApprove: (fileId: string, finalName?: string) => void;
   onReject: (fileId: string) => void;
   isSelected?: boolean;
   onSelect?: (fileId: string, selected: boolean) => void;
@@ -39,6 +39,8 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
   onSelect,
 }) => {
   const [showDetails, setShowDetails] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState(file.suggestedName);
 
   const getFileIcon = (fileName: string, category: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
@@ -83,6 +85,29 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
     setShowDetails(!showDetails);
   };
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditing(true);
+    setEditedName(file.suggestedName);
+  };
+
+  const handleSaveEdit = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.stopPropagation();
+    setIsEditing(false);
+    onApprove(file.id, editedName);
+  };
+
+  const handleCancelEdit = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.stopPropagation();
+    setIsEditing(false);
+    setEditedName(file.suggestedName);
+  };
+
+  const handleApproveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onApprove(file.id);
+  };
+
   return (
     <div className={`file-review-card ${isSelected ? 'selected' : ''}`}>
       {/* Quick Review Section */}
@@ -115,7 +140,24 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
             </div>
             <div className="suggested-name">
               <span className="label">To:</span>
-              <span className="name">{file.suggestedName}</span>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  className="edit-name-input"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveEdit(e);
+                    } else if (e.key === 'Escape') {
+                      handleCancelEdit(e);
+                    }
+                  }}
+                />
+              ) : (
+                <span className="name">{file.suggestedName}</span>
+              )}
             </div>
           </div>
           
@@ -133,29 +175,59 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
         </div>
         
         <div className="action-buttons">
-          <button 
-            className="action-btn approve-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onApprove(file.id);
-            }}
-            title="Approve rename"
-          >
-            <span className="btn-icon">✓</span>
-            <span className="btn-text">Approve</span>
-          </button>
-          
-          <button 
-            className="action-btn reject-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onReject(file.id);
-            }}
-            title="Reject rename"
-          >
-            <span className="btn-icon">✗</span>
-            <span className="btn-text">Reject</span>
-          </button>
+          {isEditing ? (
+            <>
+              <button 
+                className="action-btn save-btn"
+                onClick={handleSaveEdit}
+                title="Save and rename"
+              >
+                <span className="btn-icon">💾</span>
+                <span className="btn-text">Save</span>
+              </button>
+              
+              <button 
+                className="action-btn cancel-btn"
+                onClick={handleCancelEdit}
+                title="Cancel editing"
+              >
+                <span className="btn-icon">↩️</span>
+                <span className="btn-text">Cancel</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                className="action-btn approve-btn"
+                onClick={handleApproveClick}
+                title="Approve rename"
+              >
+                <span className="btn-icon">✓</span>
+                <span className="btn-text">Approve</span>
+              </button>
+              
+              <button 
+                className="action-btn edit-btn"
+                onClick={handleEditClick}
+                title="Edit name before applying"
+              >
+                <span className="btn-icon">✏️</span>
+                <span className="btn-text">Edit</span>
+              </button>
+              
+              <button 
+                className="action-btn reject-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReject(file.id);
+                }}
+                title="Reject rename"
+              >
+                <span className="btn-icon">✗</span>
+                <span className="btn-text">Reject</span>
+              </button>
+            </>
+          )}
           
           <button 
             className="action-btn details-btn"
