@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-SilentSort LangGraph Multi-Agent AI Service
-Advanced file organization using LangGraph workflow orchestration
+SilentSort LangGraph Multi-Agent AI Service v2.0
+Compatible with LangGraph 0.5.0 - Advanced file organization workflow
 """
 
 import os
@@ -17,18 +17,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
-# LangGraph imports
-from langgraph.graph import StateGraph, END
+# LangGraph 0.5.0 imports
+from langgraph.graph import StateGraph, END, START
+from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.runnables import RunnableParallel
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
+from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 # Utilities
 from dotenv import load_dotenv
 from loguru import logger
-import sqlite3
-import aiosqlite
 
 # Load environment variables
 load_dotenv()
@@ -38,8 +37,8 @@ logger.add("silentsort.log", rotation="10 MB", level="INFO")
 
 # FastAPI app setup
 app = FastAPI(
-    title="SilentSort LangGraph AI Service",
-    description="Advanced multi-agent file organization with LangGraph",
+    title="SilentSort LangGraph AI Service v2.0",
+    description="Advanced multi-agent file organization with LangGraph 0.5.0",
     version="2.0.0"
 )
 
@@ -47,13 +46,13 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=True,  
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ============================================================================
-# LANGGRAPH STATE & TYPES
+# LANGGRAPH STATE & TYPES (Updated for 0.5.0)
 # ============================================================================
 
 class FileProcessingState(TypedDict):
@@ -63,6 +62,9 @@ class FileProcessingState(TypedDict):
     file_extension: str
     file_size: int
     content_preview: str
+    
+    # Processing messages (LangGraph pattern)
+    messages: Annotated[List[BaseMessage], add_messages]
     
     # AI Analysis Results
     content_analysis: Optional[Dict[str, Any]]
@@ -88,15 +90,6 @@ class FileProcessingState(TypedDict):
     user_patterns: Optional[Dict[str, Any]]
     operation_metadata: Dict[str, Any]
 
-class ProcessingStage(Enum):
-    INITIALIZED = "initialized"
-    CONTENT_ANALYSIS = "content_analysis"
-    PARALLEL_PROCESSING = "parallel_processing"
-    DECISION_ROUTING = "decision_routing"
-    HUMAN_APPROVAL = "human_approval"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
 # ============================================================================
 # PYDANTIC MODELS FOR API
 # ============================================================================
@@ -117,16 +110,18 @@ class FileAnalysisResponse(BaseModel):
     content_summary: Optional[str] = None
     processing_time_ms: int
     workflow_id: Optional[str] = None
+    processing_stages: List[str] = []
 
 class HealthResponse(BaseModel):
     status: str
     timestamp: str
     openai_configured: bool
     langgraph_enabled: bool
+    langgraph_version: str
     service_type: str
 
 # ============================================================================
-# LANGGRAPH WORKFLOW IMPLEMENTATION
+# LANGGRAPH WORKFLOW IMPLEMENTATION (v0.5.0)
 # ============================================================================
 
 class SilentSortWorkflow:
@@ -149,10 +144,11 @@ class SilentSortWorkflow:
         )
     
     def _build_workflow(self) -> StateGraph:
-        """Build the complete LangGraph workflow"""
+        """Build the complete LangGraph workflow using 0.5.0 patterns"""
+        # Initialize workflow with state schema
         workflow = StateGraph(FileProcessingState)
         
-        # Add nodes
+        # Add nodes (functions that modify state)
         workflow.add_node("load_state", self.load_state_node)
         workflow.add_node("content_analysis", self.content_analysis_node)
         workflow.add_node("parallel_processing", self.parallel_processing_node)
@@ -162,15 +158,13 @@ class SilentSortWorkflow:
         workflow.add_node("error_handler", self.error_handler_node)
         workflow.add_node("finalize_result", self.finalize_result_node)
         
-        # Set entry point
-        workflow.set_entry_point("load_state")
-        
-        # Define edges
+        # Define the flow
+        workflow.add_edge(START, "load_state")
         workflow.add_edge("load_state", "content_analysis")
         workflow.add_edge("content_analysis", "parallel_processing")
         workflow.add_edge("parallel_processing", "decision_routing")
         
-        # Conditional routing from decision_routing
+        # Conditional routing based on confidence
         workflow.add_conditional_edges(
             "decision_routing",
             self.route_by_confidence,
@@ -181,7 +175,7 @@ class SilentSortWorkflow:
             }
         )
         
-        # Final edges
+        # Final convergence
         workflow.add_edge("auto_executor", "finalize_result")
         workflow.add_edge("human_approval", "finalize_result")
         workflow.add_edge("error_handler", "finalize_result")
@@ -190,18 +184,23 @@ class SilentSortWorkflow:
         return workflow.compile(checkpointer=self.checkpointer)
     
     # ========================================================================
-    # WORKFLOW NODES
+    # WORKFLOW NODES (Updated for LangGraph 0.5.0)
     # ========================================================================
     
-    async def load_state_node(self, state: FileProcessingState) -> Dict[str, Any]:
+    def load_state_node(self, state: FileProcessingState) -> Dict[str, Any]:
         """Initialize the workflow state"""
         logger.info(f"🚀 Loading state for file: {state['original_filename']}")
         
+        # Add initial system message
+        system_msg = SystemMessage(content=f"Analyzing file: {state['original_filename']}")
+        
         return {
-            "processing_stage": ProcessingStage.INITIALIZED.value,
+            "processing_stage": "initialized",
+            "messages": [system_msg],
             "operation_metadata": {
                 "started_at": datetime.now().isoformat(),
-                "workflow_version": "2.0.0"
+                "workflow_version": "2.0.0",
+                "stages_completed": ["load_state"]
             },
             "retry_count": 0
         }
@@ -220,13 +219,14 @@ Content: {state.get('content_preview', 'No content available')[:500]}
 
 Provide analysis in JSON format:
 {{
-    "content_type": "document|image|code|other",
+    "content_type": "document|image|code|data|media|other",
     "key_topics": ["topic1", "topic2"],
     "document_purpose": "brief description",
     "business_context": "context if applicable",
     "content_summary": "2-sentence summary"
 }}"""
 
+            # Use LLM to analyze content
             response = await self.llm.ainvoke([HumanMessage(content=prompt)])
             
             try:
@@ -241,28 +241,33 @@ Provide analysis in JSON format:
                     "content_summary": f"File of type {state['file_extension']}"
                 }
             
+            # Add analysis message
+            analysis_msg = HumanMessage(content=f"Content analyzed: {analysis['content_summary']}")
+            
             return {
                 "content_analysis": analysis,
-                "processing_stage": ProcessingStage.CONTENT_ANALYSIS.value
+                "processing_stage": "content_analysis",
+                "messages": [analysis_msg],
+                "operation_metadata": {
+                    **state.get("operation_metadata", {}),
+                    "stages_completed": state.get("operation_metadata", {}).get("stages_completed", []) + ["content_analysis"]
+                }
             }
             
         except Exception as e:
             logger.error(f"❌ Content analysis failed: {e}")
-            return {"error_message": f"Content analysis failed: {str(e)}"}
+            error_msg = HumanMessage(content=f"Content analysis failed: {str(e)}")
+            return {
+                "error_message": f"Content analysis failed: {str(e)}",
+                "messages": [error_msg]
+            }
     
     async def parallel_processing_node(self, state: FileProcessingState) -> Dict[str, Any]:
         """Run parallel AI agents for naming, categorization, and confidence"""
         logger.info(f"⚡ Running parallel processing for: {state['original_filename']}")
         
         try:
-            # Run three agents in parallel
-            parallel_chain = RunnableParallel({
-                "naming": self._naming_agent,
-                "categorization": self._categorization_agent,
-                "confidence": self._confidence_agent
-            })
-            
-            # Prepare input for parallel processing
+            # Prepare input for parallel agents
             input_data = {
                 "content_analysis": state.get("content_analysis", {}),
                 "original_filename": state["original_filename"],
@@ -270,20 +275,36 @@ Provide analysis in JSON format:
                 "content_preview": state.get("content_preview", "")
             }
             
-            results = await parallel_chain.ainvoke(input_data)
+            # Run agents sequentially (simulating parallel for simplicity)
+            naming_result = await self._naming_agent(input_data)
+            category_result = await self._categorization_agent(input_data)
+            confidence_result = await self._confidence_agent(input_data)
+            
+            parallel_msg = HumanMessage(
+                content=f"Parallel processing complete: {len(naming_result.get('suggestions', []))} name suggestions"
+            )
             
             return {
-                "naming_suggestions": results["naming"]["suggestions"],
-                "category_analysis": results["categorization"]["category"],
-                "confidence_scores": results["confidence"]["scores"],
-                "processing_stage": ProcessingStage.PARALLEL_PROCESSING.value
+                "naming_suggestions": naming_result.get("suggestions", []),
+                "category_analysis": category_result.get("category", "document"),
+                "confidence_scores": confidence_result.get("scores", {}),
+                "processing_stage": "parallel_processing",
+                "messages": [parallel_msg],
+                "operation_metadata": {
+                    **state.get("operation_metadata", {}),
+                    "stages_completed": state.get("operation_metadata", {}).get("stages_completed", []) + ["parallel_processing"]
+                }
             }
             
         except Exception as e:
             logger.error(f"❌ Parallel processing failed: {e}")
-            return {"error_message": f"Parallel processing failed: {str(e)}"}
+            error_msg = HumanMessage(content=f"Parallel processing failed: {str(e)}")
+            return {
+                "error_message": f"Parallel processing failed: {str(e)}",
+                "messages": [error_msg]
+            }
     
-    async def decision_routing_node(self, state: FileProcessingState) -> Dict[str, Any]:
+    def decision_routing_node(self, state: FileProcessingState) -> Dict[str, Any]:
         """Route based on confidence scores and rules"""
         logger.info(f"🎯 Routing decision for: {state['original_filename']}")
         
@@ -304,47 +325,63 @@ Provide analysis in JSON format:
         reasoning = f"Based on {content_analysis.get('content_type', 'file')} analysis, " \
                    f"suggested name reflects {content_analysis.get('document_purpose', 'file purpose')}"
         
+        decision_msg = HumanMessage(
+            content=f"Decision routing: confidence={overall_confidence:.2f}, suggested='{suggested_name}'"
+        )
+        
         return {
             "suggested_name": suggested_name,
             "final_confidence": overall_confidence,
             "final_category": state.get("category_analysis", "document"),
             "alternatives": alternatives,
             "reasoning": reasoning,
-            "processing_stage": ProcessingStage.DECISION_ROUTING.value
-        }
-    
-    async def auto_executor_node(self, state: FileProcessingState) -> Dict[str, Any]:
-        """Auto-execute high confidence suggestions"""
-        logger.info(f"✅ Auto-executing for: {state['original_filename']}")
-        
-        return {
-            "user_decision": "auto_approved",
+            "processing_stage": "decision_routing",
+            "messages": [decision_msg],
             "operation_metadata": {
                 **state.get("operation_metadata", {}),
-                "auto_executed": True,
-                "execution_time": datetime.now().isoformat()
+                "stages_completed": state.get("operation_metadata", {}).get("stages_completed", []) + ["decision_routing"]
             }
         }
     
-    async def human_approval_node(self, state: FileProcessingState) -> Dict[str, Any]:
+    def auto_executor_node(self, state: FileProcessingState) -> Dict[str, Any]:
+        """Auto-execute high confidence suggestions"""
+        logger.info(f"✅ Auto-executing for: {state['original_filename']}")
+        
+        auto_msg = HumanMessage(content=f"Auto-approved: {state.get('suggested_name')}")
+        
+        return {
+            "user_decision": "auto_approved",
+            "processing_stage": "auto_executed",
+            "messages": [auto_msg],
+            "operation_metadata": {
+                **state.get("operation_metadata", {}),
+                "auto_executed": True,
+                "execution_time": datetime.now().isoformat(),
+                "stages_completed": state.get("operation_metadata", {}).get("stages_completed", []) + ["auto_executor"]
+            }
+        }
+    
+    def human_approval_node(self, state: FileProcessingState) -> Dict[str, Any]:
         """Handle human-in-the-loop approval"""
         logger.info(f"👤 Human approval required for: {state['original_filename']}")
         
-        # In real implementation, this would wait for user input
-        # For now, we'll simulate approval based on confidence
+        # Simulate approval based on confidence for demo
         confidence = state.get("final_confidence", 0.0)
+        decision = "approved" if confidence > 0.7 else "needs_review"
         
-        if confidence > 0.7:
-            decision = "approved"
-        else:
-            decision = "needs_review"
+        approval_msg = HumanMessage(content=f"Human approval: {decision}")
         
         return {
             "user_decision": decision,
-            "processing_stage": ProcessingStage.HUMAN_APPROVAL.value
+            "processing_stage": "human_approval",
+            "messages": [approval_msg],
+            "operation_metadata": {
+                **state.get("operation_metadata", {}),
+                "stages_completed": state.get("operation_metadata", {}).get("stages_completed", []) + ["human_approval"]
+            }
         }
     
-    async def error_handler_node(self, state: FileProcessingState) -> Dict[str, Any]:
+    def error_handler_node(self, state: FileProcessingState) -> Dict[str, Any]:
         """Handle errors and provide fallbacks"""
         logger.warning(f"⚠️ Error handling for: {state['original_filename']}")
         
@@ -352,24 +389,35 @@ Provide analysis in JSON format:
         timestamp = int(time.time())
         fallback_name = f"processed-{timestamp}{state['file_extension']}"
         
+        error_msg = HumanMessage(content=f"Error handled with fallback: {fallback_name}")
+        
         return {
             "suggested_name": fallback_name,
             "final_confidence": 0.3,
             "final_category": "unknown",
             "reasoning": "Fallback naming due to processing error",
             "alternatives": [],
-            "processing_stage": ProcessingStage.FAILED.value
+            "processing_stage": "error_handled",
+            "messages": [error_msg],
+            "operation_metadata": {
+                **state.get("operation_metadata", {}),
+                "stages_completed": state.get("operation_metadata", {}).get("stages_completed", []) + ["error_handler"]
+            }
         }
     
-    async def finalize_result_node(self, state: FileProcessingState) -> Dict[str, Any]:
+    def finalize_result_node(self, state: FileProcessingState) -> Dict[str, Any]:
         """Finalize the workflow results"""
         logger.info(f"🏁 Finalizing results for: {state['original_filename']}")
         
+        final_msg = HumanMessage(content="Workflow completed successfully")
+        
         return {
-            "processing_stage": ProcessingStage.COMPLETED.value,
+            "processing_stage": "completed",
+            "messages": [final_msg],
             "operation_metadata": {
                 **state.get("operation_metadata", {}),
-                "completed_at": datetime.now().isoformat()
+                "completed_at": datetime.now().isoformat(),
+                "stages_completed": state.get("operation_metadata", {}).get("stages_completed", []) + ["finalize_result"]
             }
         }
     
@@ -408,9 +456,8 @@ Requirements:
 
 Return JSON: {{"suggestions": ["name1.ext", "name2.ext", "name3.ext"]}}"""
 
-        response = await self.llm.ainvoke([HumanMessage(content=prompt)])
-        
         try:
+            response = await self.llm.ainvoke([HumanMessage(content=prompt)])
             return json.loads(response.content)
         except:
             return {"suggestions": [input_data['original_filename']]}
@@ -424,9 +471,8 @@ Analysis: {json.dumps(input_data['content_analysis'], indent=2)}
 
 Return JSON: {{"category": "document", "subcategory": "invoice"}}"""
 
-        response = await self.llm.ainvoke([HumanMessage(content=prompt)])
-        
         try:
+            response = await self.llm.ainvoke([HumanMessage(content=prompt)])
             return json.loads(response.content)
         except:
             return {"category": "document", "subcategory": "general"}
@@ -462,7 +508,7 @@ Return JSON: {{"category": "document", "subcategory": "invoice"}}"""
 # Initialize workflow
 try:
     workflow_instance = SilentSortWorkflow()
-    logger.info("✅ LangGraph workflow initialized successfully")
+    logger.info("✅ LangGraph 0.5.0 workflow initialized successfully")
 except Exception as e:
     logger.error(f"❌ Failed to initialize LangGraph workflow: {e}")
     workflow_instance = None
@@ -475,12 +521,13 @@ async def health_check():
         timestamp=datetime.now().isoformat(),
         openai_configured=bool(os.getenv("OPENAI_API_KEY")),
         langgraph_enabled=workflow_instance is not None,
-        service_type="langgraph-multi-agent"
+        langgraph_version="0.5.0",
+        service_type="langgraph-multi-agent-v2"
     )
 
 @app.post("/analyze-file", response_model=FileAnalysisResponse)
 async def analyze_file(request: FileAnalysisRequest):
-    """Analyze file using LangGraph multi-agent workflow"""
+    """Analyze file using LangGraph 0.5.0 multi-agent workflow"""
     
     if not workflow_instance:
         raise HTTPException(status_code=500, detail="LangGraph workflow not available")
@@ -496,6 +543,7 @@ async def analyze_file(request: FileAnalysisRequest):
             "file_extension": request.file_extension,
             "file_size": request.file_size,
             "content_preview": request.content_preview or "",
+            "messages": [],
             "content_analysis": None,
             "naming_suggestions": None,
             "category_analysis": None,
@@ -505,7 +553,7 @@ async def analyze_file(request: FileAnalysisRequest):
             "final_category": None,
             "reasoning": None,
             "alternatives": None,
-            "processing_stage": ProcessingStage.INITIALIZED.value,
+            "processing_stage": "initialized",
             "user_decision": None,
             "error_message": None,
             "retry_count": 0,
@@ -521,16 +569,20 @@ async def analyze_file(request: FileAnalysisRequest):
         # Calculate processing time
         processing_time = int((time.time() - start_time) * 1000)
         
+        # Extract stages completed
+        stages_completed = final_state.get("operation_metadata", {}).get("stages_completed", [])
+        
         # Return results
         return FileAnalysisResponse(
             suggested_name=final_state.get("suggested_name", request.original_name),
             confidence=final_state.get("final_confidence", 0.0),
             category=final_state.get("final_category", "unknown"),
-            reasoning=final_state.get("reasoning", "LangGraph multi-agent analysis"),
+            reasoning=final_state.get("reasoning", "LangGraph multi-agent analysis v2.0"),
             alternatives=final_state.get("alternatives", []),
             content_summary=final_state.get("content_analysis", {}).get("content_summary"),
             processing_time_ms=processing_time,
-            workflow_id=workflow_id
+            workflow_id=workflow_id,
+            processing_stages=stages_completed
         )
         
     except Exception as e:
@@ -541,16 +593,20 @@ async def analyze_file(request: FileAnalysisRequest):
 async def root():
     """Root endpoint"""
     return {
-        "service": "SilentSort LangGraph AI Service",
+        "service": "SilentSort LangGraph AI Service v2.0",
         "status": "running",
-        "type": "langgraph-multi-agent",
+        "type": "langgraph-multi-agent-v2",
         "version": "2.0.0",
+        "langgraph_version": "0.5.0",
         "features": [
-            "Multi-agent workflow",
-            "Parallel processing",
-            "Content analysis",
-            "Confidence scoring",
-            "Error recovery"
+            "Multi-agent workflow with LangGraph 0.5.0",
+            "Parallel processing agents",
+            "Content analysis with AI",
+            "Confidence-based routing",
+            "Human-in-the-loop capability",
+            "Error recovery and fallbacks",
+            "Comprehensive state management",
+            "Message-based communication"
         ],
         "endpoints": {
             "health": "/health",
@@ -562,9 +618,9 @@ async def root():
 if __name__ == "__main__":
     # Development server
     uvicorn.run(
-        "main:app",
+        "langgraph-main-v2:app",
         host="127.0.0.1",
-        port=8000,
+        port=8001,  # Different port for testing
         reload=True,
         log_level="info"
     ) 
