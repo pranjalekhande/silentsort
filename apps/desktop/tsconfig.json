@@ -4,7 +4,7 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "esnest"
+      "esnext"
     ],
     "allowJs": true,
     "skipLibCheck": true,

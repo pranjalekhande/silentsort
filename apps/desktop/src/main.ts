@@ -1,4 +1,11 @@
-import { app, BrowserWindow, ipcMain, Menu, Tray, globalShortcut } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  Tray,
+  globalShortcut,
+} from 'electron';
 import * as path from 'path';
 import * as chokidar from 'chokidar';
 import { aiService } from './services/ai-service';
@@ -17,12 +24,12 @@ class SilentSortApp {
 
   private async setupApp(): Promise<void> {
     await app.whenReady();
-    
+
     // Test AI service on startup
     console.log('🧪 Testing AI service connection...');
     const testResult = await aiService.testConnection();
     console.log('🔍 AI Service Test:', testResult);
-    
+
     this.createMainWindow();
     this.setupTray();
     this.setupFileWatcher();
@@ -36,7 +43,7 @@ class SilentSortApp {
     console.log('🔍 Preload path (absolute):', preloadPath);
     console.log('🔍 __dirname:', __dirname);
     console.log('🔍 Preload exists:', require('fs').existsSync(preloadPath));
-    
+
     this.mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
@@ -44,20 +51,20 @@ class SilentSortApp {
         nodeIntegration: false,
         contextIsolation: true,
         preload: preloadPath,
-        webSecurity: false  // Adding this for development
+        webSecurity: false, // Adding this for development
       },
       show: true, // Show window in development
-      titleBarStyle: 'hiddenInset'
+      titleBarStyle: 'hiddenInset',
     });
 
     // Load the React app - always use localhost:3000 in development
     this.mainWindow.loadURL('http://localhost:3000');
     this.mainWindow.webContents.openDevTools();
-    
+
     // Debug when page loads
     this.mainWindow.webContents.once('did-finish-load', () => {
       console.log('🎯 Page loaded, checking preload...');
-      
+
       // Check if electronAPI is available
       this.mainWindow?.webContents.executeJavaScript(`
         console.log("🔍 RENDERER: electronAPI type:", typeof window.electronAPI);
@@ -67,13 +74,22 @@ class SilentSortApp {
     });
 
     // Additional debugging for preload script
-    this.mainWindow.webContents.once('preload-error', (event, preloadPath, error) => {
-      console.error('❌ Preload script error:', { preloadPath, error });
-    });
+    this.mainWindow.webContents.once(
+      'preload-error',
+      (event, preloadPath, error) => {
+        console.error('❌ Preload script error:', { preloadPath, error });
+      }
+    );
 
-    this.mainWindow.webContents.once('did-fail-load', (event, errorCode, errorDescription) => {
-      console.error('❌ Page failed to load:', { errorCode, errorDescription });
-    });
+    this.mainWindow.webContents.once(
+      'did-fail-load',
+      (event, errorCode, errorDescription) => {
+        console.error('❌ Page failed to load:', {
+          errorCode,
+          errorDescription,
+        });
+      }
+    );
   }
 
   private setupTray(): void {
@@ -84,14 +100,14 @@ class SilentSortApp {
   private setupFileWatcher(): void {
     // Watch only our test folder for now
     const watchPaths = [
-      path.join(require('os').homedir(), 'Downloads', 'silentsort-test')
+      path.join(require('os').homedir(), 'Downloads', 'silentsort-test'),
     ];
 
     console.log('Setting up file watcher for TEST folder:', watchPaths);
 
     this.fileWatcher = chokidar.watch(watchPaths, {
       ignoreInitial: false,
-      persistent: true
+      persistent: true,
     });
 
     this.fileWatcher.on('ready', () => {
@@ -116,21 +132,21 @@ class SilentSortApp {
       }
 
       console.log('🤖 Auto-processing file with AI:', filePath);
-      
+
       // Process file with AI immediately
       const aiResult = await aiService.analyzeFile(filePath);
       console.log('✅ AI auto-analysis completed:', aiResult);
-      
+
       // Send file with AI analysis to renderer
       if (this.mainWindow) {
         this.mainWindow.webContents.send('new-file-detected', {
           filePath,
-          aiResult
+          aiResult,
         });
       }
     } catch (error) {
       console.error('❌ Error processing file:', error);
-      
+
       // Send file with error to renderer
       if (this.mainWindow) {
         this.mainWindow.webContents.send('new-file-detected', {
@@ -140,8 +156,8 @@ class SilentSortApp {
             confidence: 0,
             category: 'error',
             reasoning: 'AI analysis failed',
-            error: error instanceof Error ? error.message : 'Unknown error'
-          }
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
         });
       }
     }
@@ -173,7 +189,7 @@ class SilentSortApp {
           confidence: 0,
           category: 'error',
           reasoning: 'AI analysis failed',
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         };
       }
     });
@@ -186,36 +202,42 @@ class SilentSortApp {
       return result;
     });
 
-    ipcMain.handle('rename-file', async (event, oldPath: string, newPath: string) => {
-      console.log('📝 File rename requested:', { oldPath, newPath });
-      
-      try {
-        const fs = require('fs').promises;
-        
-        // Check if source file exists
-        await fs.access(oldPath);
-        
-        // Check if destination already exists
+    ipcMain.handle(
+      'rename-file',
+      async (event, oldPath: string, newPath: string) => {
+        console.log('📝 File rename requested:', { oldPath, newPath });
+
         try {
-          await fs.access(newPath);
-          return { success: false, message: 'Destination file already exists' };
-        } catch {
-          // File doesn't exist, which is good
+          const fs = require('fs').promises;
+
+          // Check if source file exists
+          await fs.access(oldPath);
+
+          // Check if destination already exists
+          try {
+            await fs.access(newPath);
+            return {
+              success: false,
+              message: 'Destination file already exists',
+            };
+          } catch {
+            // File doesn't exist, which is good
+          }
+
+          // Perform the rename
+          await fs.rename(oldPath, newPath);
+          console.log('✅ File renamed successfully:', { oldPath, newPath });
+
+          return { success: true, message: 'File renamed successfully' };
+        } catch (error) {
+          console.error('❌ File rename failed:', error);
+          return {
+            success: false,
+            message: error instanceof Error ? error.message : 'Unknown error',
+          };
         }
-        
-        // Perform the rename
-        await fs.rename(oldPath, newPath);
-        console.log('✅ File renamed successfully:', { oldPath, newPath });
-        
-        return { success: true, message: 'File renamed successfully' };
-      } catch (error) {
-        console.error('❌ File rename failed:', error);
-        return { 
-          success: false, 
-          message: error instanceof Error ? error.message : 'Unknown error' 
-        };
       }
-    });
+    );
 
     // App event handlers
     app.on('window-all-closed', () => {
@@ -251,4 +273,4 @@ class SilentSortApp {
 }
 
 // Initialize the app
-new SilentSortApp(); 
+new SilentSortApp();

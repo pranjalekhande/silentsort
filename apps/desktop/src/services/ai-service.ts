@@ -31,7 +31,7 @@ class AIService {
 
   private initializeOpenAI(): void {
     const apiKey = process.env.OPENAI_API_KEY;
-    
+
     if (!apiKey || apiKey === 'your_openai_api_key_here') {
       console.error('OpenAI API key not configured');
       this.isConfigured = false;
@@ -57,18 +57,18 @@ class AIService {
         confidence: 0,
         category: 'unknown',
         reasoning: 'AI service not configured',
-        error: 'OpenAI API key not configured'
+        error: 'OpenAI API key not configured',
       };
     }
 
     try {
       const metadata = await this.extractFileMetadata(filePath);
       const analysis = await this.performContentAnalysis(metadata);
-      
+
       console.log('AI Analysis completed:', {
         original: metadata.originalName,
         suggested: analysis.suggestedName,
-        confidence: analysis.confidence
+        confidence: analysis.confidence,
       });
 
       return analysis;
@@ -79,7 +79,7 @@ class AIService {
         confidence: 0,
         category: 'error',
         reasoning: 'Analysis failed',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -88,9 +88,9 @@ class AIService {
     const stats = fs.statSync(filePath);
     const fileName = path.basename(filePath);
     const fileExtension = path.extname(filePath).toLowerCase();
-    
+
     let content = '';
-    
+
     // Extract content based on file type
     if (this.isTextFile(fileExtension)) {
       try {
@@ -108,22 +108,35 @@ class AIService {
       filePath,
       fileSize: stats.size,
       fileExtension,
-      content
+      content,
     };
   }
 
   private isTextFile(extension: string): boolean {
-    const textExtensions = ['.txt', '.md', '.json', '.csv', '.log', '.py', '.js', '.ts', '.html', '.css'];
+    const textExtensions = [
+      '.txt',
+      '.md',
+      '.json',
+      '.csv',
+      '.log',
+      '.py',
+      '.js',
+      '.ts',
+      '.html',
+      '.css',
+    ];
     return textExtensions.includes(extension);
   }
 
-  private async performContentAnalysis(metadata: FileMetadata): Promise<FileAnalysisResult> {
+  private async performContentAnalysis(
+    metadata: FileMetadata
+  ): Promise<FileAnalysisResult> {
     if (!this.openai) {
       throw new Error('OpenAI client not initialized');
     }
-    
+
     const prompt = this.buildAnalysisPrompt(metadata);
-    
+
     try {
       const completion = await this.openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
@@ -146,7 +159,7 @@ class AIService {
 
   private buildAnalysisPrompt(metadata: FileMetadata): string {
     const { originalName, fileExtension, fileSize, content } = metadata;
-    
+
     return `You are a smart file organizer. Analyze this file and suggest a better, descriptive filename.
 
 File Information:
@@ -174,15 +187,18 @@ Respond in this exact JSON format:
 Only respond with valid JSON, no additional text.`;
   }
 
-  private parseAIResponse(response: string, fallbackName: string): FileAnalysisResult {
+  private parseAIResponse(
+    response: string,
+    fallbackName: string
+  ): FileAnalysisResult {
     try {
       const parsed = JSON.parse(response.trim());
-      
+
       return {
         suggestedName: parsed.suggestedName || fallbackName,
         confidence: Math.max(0, Math.min(1, parsed.confidence || 0)),
         category: parsed.category || 'unknown',
-        reasoning: parsed.reasoning || 'No reasoning provided'
+        reasoning: parsed.reasoning || 'No reasoning provided',
       };
     } catch (error) {
       console.error('❌ Failed to parse AI response:', error);
@@ -191,7 +207,7 @@ Only respond with valid JSON, no additional text.`;
         confidence: 0,
         category: 'error',
         reasoning: 'Failed to parse AI response',
-        error: 'Invalid JSON response from AI'
+        error: 'Invalid JSON response from AI',
       };
     }
   }
@@ -201,32 +217,38 @@ Only respond with valid JSON, no additional text.`;
     if (!this.isConfigured || !this.openai) {
       return {
         success: false,
-        message: 'OpenAI API key not configured'
+        message: 'OpenAI API key not configured',
       };
     }
 
     try {
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: 'Respond with exactly: "SilentSort AI service is working!"' }],
+        messages: [
+          {
+            role: 'user',
+            content:
+              'Respond with exactly: "SilentSort AI service is working!"',
+          },
+        ],
         max_tokens: 50,
         temperature: 0,
       });
 
       const response = completion.choices[0]?.message?.content;
-      
+
       return {
         success: true,
-        message: response || 'Connection successful but no response'
+        message: response || 'Connection successful but no response',
       };
     } catch (error) {
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 }
 
 // Export singleton instance
-export const aiService = new AIService(); 
+export const aiService = new AIService();

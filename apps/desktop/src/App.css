@@ -6,7 +6,8 @@
   min-height: 100vh;
   padding: 20px;
   color: white;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .app-header {
@@ -17,7 +18,7 @@
   font-size: 2.5rem;
   font-weight: 700;
   margin: 0 0 10px 0;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .app-header p {
@@ -30,13 +31,13 @@
 .test-section {
   margin: 20px 0;
   padding: 15px;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   backdrop-filter: blur(10px);
 }
 
 .test-ai-btn {
-  background: linear-gradient(45deg, #4CAF50, #45a049);
+  background: linear-gradient(45deg, #4caf50, #45a049);
   color: white;
   border: none;
   padding: 12px 24px;
@@ -44,13 +45,13 @@
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
 }
 
 .test-ai-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
 .test-result {
@@ -63,7 +64,7 @@
 
 .test-result.success {
   background: rgba(76, 175, 80, 0.2);
-  border: 2px solid #4CAF50;
+  border: 2px solid #4caf50;
 }
 
 .test-result.error {
@@ -83,16 +84,16 @@
   font-size: 1.1rem;
   border: none;
   border-radius: 25px;
-  background: rgba(255,255,255,0.95);
+  background: rgba(255, 255, 255, 0.95);
   color: #333;
   outline: none;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
 }
 
 .search-input:focus {
   background: white;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
 }
 
@@ -107,7 +108,7 @@
   gap: 30px;
   margin-bottom: 20px;
   padding: 12px;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   backdrop-filter: blur(10px);
   max-width: 600px;
@@ -125,8 +126,13 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* Files List */
@@ -136,7 +142,7 @@
 }
 
 .empty-state {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   padding: 40px;
   border-radius: 15px;
   backdrop-filter: blur(10px);
@@ -159,12 +165,12 @@
 
 /* File Items */
 .file-item {
-  background: rgba(255,255,255,0.95);
+  background: rgba(255, 255, 255, 0.95);
   color: #333;
   margin: 15px 0;
   padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
   text-align: left;
   display: flex;
@@ -175,11 +181,11 @@
 
 .file-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
 .file-item.processing {
-  border-left: 4px solid #2196F3;
+  border-left: 4px solid #2196f3;
   background: rgba(33, 150, 243, 0.05);
 }
 
@@ -189,7 +195,7 @@
 }
 
 .file-item.approved {
-  border-left: 4px solid #4CAF50;
+  border-left: 4px solid #4caf50;
   background: rgba(76, 175, 80, 0.05);
 }
 
@@ -218,11 +224,11 @@
 .suggested-name {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #2196F3;
+  color: #2196f3;
 }
 
 .confidence {
-  color: #4CAF50;
+  color: #4caf50;
   font-size: 0.9rem;
   font-weight: 600;
   margin-left: 8px;
@@ -275,7 +281,8 @@
   min-width: 120px;
 }
 
-.approve-btn, .reject-btn {
+.approve-btn,
+.reject-btn {
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
@@ -286,14 +293,14 @@
 }
 
 .approve-btn {
-  background: linear-gradient(45deg, #4CAF50, #45a049);
+  background: linear-gradient(45deg, #4caf50, #45a049);
   color: white;
 }
 
 .approve-btn:hover {
   background: linear-gradient(45deg, #45a049, #3d8b40);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .reject-btn {
@@ -304,7 +311,7 @@
 .reject-btn:hover {
   background: linear-gradient(45deg, #d32f2f, #b71c1c);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* Status Indicators */
@@ -318,7 +325,7 @@
 }
 
 .status-indicator.approved {
-  background: linear-gradient(45deg, #4CAF50, #45a049);
+  background: linear-gradient(45deg, #4caf50, #45a049);
   color: white;
 }
 
@@ -332,24 +339,24 @@
   .app {
     padding: 15px;
   }
-  
+
   .file-item {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .file-actions {
     flex-direction: row;
     margin-top: 15px;
     min-width: auto;
   }
-  
+
   .status-bar {
     flex-direction: column;
     gap: 10px;
   }
-  
+
   .app-header h1 {
     font-size: 2rem;
   }
-} 
+}

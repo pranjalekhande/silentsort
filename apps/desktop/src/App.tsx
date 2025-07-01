@@ -17,26 +17,38 @@ const App: React.FC = () => {
   const [files, setFiles] = useState<FileProcessingItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [aiTestResult, setAiTestResult] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('Checking API...');
 
   useEffect(() => {
     // Debug electronAPI availability
     console.log('🔍 App mounted. window.electronAPI:', window.electronAPI);
     console.log('🔍 electronAPI type:', typeof window.electronAPI);
-    console.log('🔍 electronAPI methods:', window.electronAPI ? Object.keys(window.electronAPI) : 'undefined');
-    
-    setDebugInfo(`electronAPI: ${window.electronAPI ? 'Available' : 'Missing'} | Methods: ${window.electronAPI ? Object.keys(window.electronAPI).join(', ') : 'none'}`);
+    console.log(
+      '🔍 electronAPI methods:',
+      window.electronAPI ? Object.keys(window.electronAPI) : 'undefined'
+    );
+
+    setDebugInfo(
+      `electronAPI: ${window.electronAPI ? 'Available' : 'Missing'} | Methods: ${window.electronAPI ? Object.keys(window.electronAPI).join(', ') : 'none'}`
+    );
 
     // Listen for new files detected by the main process
     if (window.electronAPI) {
-      window.electronAPI.onNewFileDetected((data: { filePath: string; aiResult: any }) => {
-        handleNewFileWithAI(data.filePath, data.aiResult);
-      });
+      window.electronAPI.onNewFileDetected(
+        (data: { filePath: string; aiResult: any }) => {
+          handleNewFileWithAI(data.filePath, data.aiResult);
+        }
+      );
 
       window.electronAPI.onFocusSearch(() => {
         // Focus the search input when global shortcut is pressed
-        const searchInput = document.getElementById('search-input') as HTMLInputElement;
+        const searchInput = document.getElementById(
+          'search-input'
+        ) as HTMLInputElement;
         if (searchInput) {
           searchInput.focus();
         }
@@ -57,11 +69,11 @@ const App: React.FC = () => {
   const handleTestAI = async () => {
     console.log('🧪 Test AI button clicked');
     console.log('🔍 window.electronAPI:', window.electronAPI);
-    
+
     if (!window.electronAPI) {
       setAiTestResult({
         success: false,
-        message: 'electronAPI not available - preload script issue'
+        message: 'electronAPI not available - preload script issue',
       });
       return;
     }
@@ -69,7 +81,7 @@ const App: React.FC = () => {
     if (!window.electronAPI.testAIService) {
       setAiTestResult({
         success: false,
-        message: 'testAIService method not available'
+        message: 'testAIService method not available',
       });
       return;
     }
@@ -83,7 +95,9 @@ const App: React.FC = () => {
       console.error('❌ Failed to test AI service:', error);
       setAiTestResult({
         success: false,
-        message: 'Failed to test AI service: ' + (error instanceof Error ? error.message : 'Unknown error')
+        message:
+          'Failed to test AI service: ' +
+          (error instanceof Error ? error.message : 'Unknown error'),
       });
     }
   };
@@ -102,7 +116,7 @@ const App: React.FC = () => {
       category: aiResult.category,
       reasoning: aiResult.reasoning,
       status: aiResult.error ? 'rejected' : 'pending',
-      error: aiResult.error
+      error: aiResult.error,
     };
 
     setFiles(prev => [newFile, ...prev]);
@@ -122,7 +136,7 @@ const App: React.FC = () => {
       confidence: 0,
       category: 'unknown',
       reasoning: 'Processing file...',
-      status: 'processing'
+      status: 'processing',
     };
 
     setFiles(prev => [newFile, ...prev]);
@@ -131,35 +145,39 @@ const App: React.FC = () => {
     try {
       // Process file with AI
       const result = await window.electronAPI.processFileContent(filePath);
-      
+
       // Update file with AI suggestion
-      setFiles(prev => prev.map(file => 
-        file.id === fileId 
-          ? { 
-              ...file, 
-              suggestedName: result.suggestedName, 
-              confidence: result.confidence,
-              category: result.category,
-              reasoning: result.reasoning,
-              error: result.error,
-              status: result.error ? 'rejected' : 'pending'
-            }
-          : file
-      ));
+      setFiles(prev =>
+        prev.map(file =>
+          file.id === fileId
+            ? {
+                ...file,
+                suggestedName: result.suggestedName,
+                confidence: result.confidence,
+                category: result.category,
+                reasoning: result.reasoning,
+                error: result.error,
+                status: result.error ? 'rejected' : 'pending',
+              }
+            : file
+        )
+      );
     } catch (error) {
       console.error('Error processing file:', error);
-      setFiles(prev => prev.map(file => 
-        file.id === fileId 
-          ? { 
-              ...file, 
-              suggestedName: 'Error processing file',
-              confidence: 0,
-              category: 'error',
-              reasoning: 'Failed to process file',
-              status: 'rejected'
-            }
-          : file
-      ));
+      setFiles(prev =>
+        prev.map(file =>
+          file.id === fileId
+            ? {
+                ...file,
+                suggestedName: 'Error processing file',
+                confidence: 0,
+                category: 'error',
+                reasoning: 'Failed to process file',
+                status: 'rejected',
+              }
+            : file
+        )
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -167,13 +185,21 @@ const App: React.FC = () => {
 
   const handleApproveRename = async (file: FileProcessingItem) => {
     try {
-      const newPath = file.originalPath.replace(file.originalName, file.suggestedName);
-      const result = await window.electronAPI.renameFile(file.originalPath, newPath);
-      
+      const newPath = file.originalPath.replace(
+        file.originalName,
+        file.suggestedName
+      );
+      const result = await window.electronAPI.renameFile(
+        file.originalPath,
+        newPath
+      );
+
       if (result.success) {
-        setFiles(prev => prev.map(f => 
-          f.id === file.id ? { ...f, status: 'approved' as const } : f
-        ));
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === file.id ? { ...f, status: 'approved' as const } : f
+          )
+        );
       }
     } catch (error) {
       console.error('Error renaming file:', error);
@@ -181,118 +207,137 @@ const App: React.FC = () => {
   };
 
   const handleRejectRename = (fileId: string) => {
-    setFiles(prev => prev.map(file => 
-      file.id === fileId ? { ...file, status: 'rejected' as const } : file
-    ));
+    setFiles(prev =>
+      prev.map(file =>
+        file.id === fileId ? { ...file, status: 'rejected' as const } : file
+      )
+    );
   };
 
-  const filteredFiles = files.filter(file => 
-    file.originalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    file.suggestedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    file.category.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredFiles = files.filter(
+    file =>
+      file.originalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      file.suggestedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      file.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="app">
-      <header className="app-header">
+    <div className='app'>
+      <header className='app-header'>
         <h1>SilentSort</h1>
         <p>AI-Powered File Organization</p>
-        
-        <div className="test-section">
-          <button onClick={handleTestAI} className="test-ai-btn">
+
+        <div className='test-section'>
+          <button onClick={handleTestAI} className='test-ai-btn'>
             🧪 Test AI Connection
           </button>
           {aiTestResult && (
-            <div className={`test-result ${aiTestResult.success ? 'success' : 'error'}`}>
+            <div
+              className={`test-result ${aiTestResult.success ? 'success' : 'error'}`}
+            >
               {aiTestResult.success ? '✅' : '❌'} {aiTestResult.message}
             </div>
           )}
-          
+
           {/* Debug Information */}
-          <div className="debug-info" style={{fontSize: '0.8rem', marginTop: '10px', opacity: 0.7}}>
+          <div
+            className='debug-info'
+            style={{ fontSize: '0.8rem', marginTop: '10px', opacity: 0.7 }}
+          >
             Debug: {debugInfo}
           </div>
         </div>
       </header>
 
-      <div className="search-section">
+      <div className='search-section'>
         <input
-          id="search-input"
-          type="text"
-          placeholder="Search files... (Cmd+Shift+F globally)"
+          id='search-input'
+          type='text'
+          placeholder='Search files... (Cmd+Shift+F globally)'
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="search-input"
+          onChange={e => setSearchQuery(e.target.value)}
+          className='search-input'
         />
       </div>
 
-      <div className="status-bar">
-        <span>Files processed: {files.filter(f => f.status === 'approved').length}</span>
+      <div className='status-bar'>
+        <span>
+          Files processed: {files.filter(f => f.status === 'approved').length}
+        </span>
         <span>Queue: {files.filter(f => f.status === 'pending').length}</span>
-        {isProcessing && <span className="processing">Processing...</span>}
+        {isProcessing && <span className='processing'>Processing...</span>}
       </div>
 
-      <div className="files-list">
+      <div className='files-list'>
         {filteredFiles.length === 0 ? (
-          <div className="empty-state">
+          <div className='empty-state'>
             <h3>No files detected yet</h3>
-            <p>Add files to your ~/Downloads/silentsort-test/ folder to see them here.</p>
-            <p><small>Test the AI connection first to ensure everything is working!</small></p>
+            <p>
+              Add files to your ~/Downloads/silentsort-test/ folder to see them
+              here.
+            </p>
+            <p>
+              <small>
+                Test the AI connection first to ensure everything is working!
+              </small>
+            </p>
           </div>
         ) : (
           filteredFiles.map(file => (
             <div key={file.id} className={`file-item ${file.status}`}>
-              <div className="file-info">
-                <div className="original-name">
+              <div className='file-info'>
+                <div className='original-name'>
                   <strong>Original:</strong> {file.originalName}
                 </div>
-                <div className="suggested-name">
+                <div className='suggested-name'>
                   <strong>Suggested:</strong> {file.suggestedName}
                   {file.confidence > 0 && (
-                    <span className="confidence">
+                    <span className='confidence'>
                       ({Math.round(file.confidence * 100)}% confident)
                     </span>
                   )}
                 </div>
-                <div className="file-category">
-                  <strong>Category:</strong> <span className="category-tag">{file.category}</span>
+                <div className='file-category'>
+                  <strong>Category:</strong>{' '}
+                  <span className='category-tag'>{file.category}</span>
                 </div>
-                <div className="file-reasoning">
+                <div className='file-reasoning'>
                   <strong>AI Reasoning:</strong> <em>{file.reasoning}</em>
                 </div>
                 {file.error && (
-                  <div className="file-error">
-                    <strong>Error:</strong> <span className="error-text">{file.error}</span>
+                  <div className='file-error'>
+                    <strong>Error:</strong>{' '}
+                    <span className='error-text'>{file.error}</span>
                   </div>
                 )}
-                <div className="file-path">
+                <div className='file-path'>
                   <small>{file.originalPath}</small>
                 </div>
               </div>
-              
+
               {file.status === 'pending' && (
-                <div className="file-actions">
-                  <button 
+                <div className='file-actions'>
+                  <button
                     onClick={() => handleApproveRename(file)}
-                    className="approve-btn"
+                    className='approve-btn'
                   >
                     ✓ Approve
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleRejectRename(file.id)}
-                    className="reject-btn"
+                    className='reject-btn'
                   >
                     ✗ Reject
                   </button>
                 </div>
               )}
-              
+
               {file.status === 'approved' && (
-                <div className="status-indicator approved">Renamed ✓</div>
+                <div className='status-indicator approved'>Renamed ✓</div>
               )}
-              
+
               {file.status === 'rejected' && (
-                <div className="status-indicator rejected">Skipped</div>
+                <div className='status-indicator rejected'>Skipped</div>
               )}
             </div>
           ))
@@ -302,4 +347,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App; 
+export default App;
