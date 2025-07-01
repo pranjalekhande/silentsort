@@ -45,41 +45,25 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
   const getFileIcon = (fileName: string, category: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
     
-    if (category.toLowerCase().includes('invoice')) {
-      return '🧾';
-    }
-    if (category.toLowerCase().includes('report')) {
-      return '📊';
-    }
-    if (['pdf'].includes(ext || '')) {
-      return '📄';
-    }
-    if (['doc', 'docx'].includes(ext || '')) {
-      return '📝';
-    }
-    if (['xlsx', 'xls', 'csv'].includes(ext || '')) {
-      return '📋';
-    }
-    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext || '')) {
-      return '🖼️';
-    }
+    if (category.toLowerCase().includes('invoice')) return '📄';
+    if (category.toLowerCase().includes('report')) return '📊';
+    if (category.toLowerCase().includes('resume')) return '👤';
+    if (['pdf'].includes(ext || '')) return '📄';
+    if (['doc', 'docx'].includes(ext || '')) return '📝';
+    if (['xlsx', 'xls', 'csv'].includes(ext || '')) return '📋';
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext || '')) return '🖼️';
     
     return '📄';
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) {
-      return 'high';
-    }
-    if (confidence >= 0.6) {
-      return 'medium';
-    }
+    if (confidence >= 0.8) return 'high';
+    if (confidence >= 0.6) return 'medium';
     return 'low';
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't toggle details if clicking on buttons or checkbox
-    if ((e.target as HTMLElement).closest('.action-buttons, .select-checkbox')) {
+    if ((e.target as HTMLElement).closest('.actions, .select-checkbox')) {
       return;
     }
     setShowDetails(!showDetails);
@@ -103,15 +87,27 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
     setEditedName(file.suggestedName);
   };
 
-  const handleApproveClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onApprove(file.id);
+  const renderKeyEntities = () => {
+    const entities = file.extracted_entities;
+    if (!entities) return null;
+    
+    const keyInfo = [];
+    if (entities.company) keyInfo.push(`🏢 ${entities.company}`);
+    if (entities.amount) keyInfo.push(`💰 ${entities.amount}`);
+    if (entities.technology?.length) keyInfo.push(`⚡ ${entities.technology.slice(0, 2).join(', ')}`);
+    
+    return keyInfo.length > 0 ? (
+      <div className="key-entities">
+        {keyInfo.map((info, i) => (
+          <span key={i} className="entity-tag">{info}</span>
+        ))}
+      </div>
+    ) : null;
   };
 
   return (
-    <div className={`file-review-card ${isSelected ? 'selected' : ''}`}>
-      {/* Quick Review Section */}
-      <div className="quick-review" onClick={handleCardClick}>
+    <div className={`file-card ${isSelected ? 'selected' : ''} ${showDetails ? 'expanded' : ''}`}>
+      <div className="card-main" onClick={handleCardClick}>
         {onSelect && (
           <div className="select-checkbox">
             <input
@@ -123,213 +119,137 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
           </div>
         )}
         
-        <div className="file-preview">
-          <div className="file-icon">
-            {getFileIcon(file.originalName, file.category)}
-          </div>
-          <div className="file-type-badge">
-            {file.category.toUpperCase()}
-          </div>
-        </div>
-        
         <div className="file-info">
-          <div className="file-names">
-            <div className="original-name">
-              <span className="label">From:</span>
-              <span className="name">{file.originalName}</span>
+          <div className="file-header">
+            <div className="file-icon">{getFileIcon(file.originalName, file.category)}</div>
+            <div className="file-meta">
+              <div className="category-badge">{file.category}</div>
+              <div className={`confidence confidence-${getConfidenceColor(file.confidence)}`}>
+                {Math.round(file.confidence * 100)}%
+              </div>
             </div>
-            <div className="suggested-name">
+          </div>
+          
+          <div className="file-names">
+            <div className="name-row">
+              <span className="label">From:</span>
+              <span className="original-name">{file.originalName}</span>
+            </div>
+            <div className="name-row main">
               <span className="label">To:</span>
               {isEditing ? (
                 <input
                   type="text"
                   value={editedName}
                   onChange={(e) => setEditedName(e.target.value)}
-                  className="edit-name-input"
+                  className="name-input"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSaveEdit(e);
-                    } else if (e.key === 'Escape') {
-                      handleCancelEdit(e);
-                    }
+                    if (e.key === 'Enter') handleSaveEdit(e);
+                    if (e.key === 'Escape') handleCancelEdit(e);
                   }}
                 />
               ) : (
-                <span className="name">{file.suggestedName}</span>
+                <span className="suggested-name">{file.suggestedName}</span>
               )}
             </div>
           </div>
           
-          <div className="confidence-indicator">
-            <div className={`confidence-bar confidence-${getConfidenceColor(file.confidence)}`}>
-              <div 
-                className="confidence-fill" 
-                style={{ width: `${file.confidence * 100}%` }}
-              ></div>
-            </div>
-            <span className="confidence-text">
-              {Math.round(file.confidence * 100)}% confident
-            </span>
-          </div>
+          {renderKeyEntities()}
         </div>
         
-        <div className="action-buttons">
+        <div className="actions">
           {isEditing ? (
             <>
-              <button 
-                className="action-btn save-btn"
-                onClick={handleSaveEdit}
-                title="Save and rename"
-              >
-                <span className="btn-icon">💾</span>
-                <span className="btn-text">Save</span>
+              <button className="action-btn save" onClick={handleSaveEdit} title="Save">
+                ✓
               </button>
-              
-              <button 
-                className="action-btn cancel-btn"
-                onClick={handleCancelEdit}
-                title="Cancel editing"
-              >
-                <span className="btn-icon">↩️</span>
-                <span className="btn-text">Cancel</span>
+              <button className="action-btn cancel" onClick={handleCancelEdit} title="Cancel">
+                ✕
               </button>
             </>
           ) : (
             <>
               <button 
-                className="action-btn approve-btn"
-                onClick={handleApproveClick}
+                className="action-btn approve" 
+                onClick={(e) => { e.stopPropagation(); onApprove(file.id); }}
                 title="Approve rename"
               >
-                <span className="btn-icon">✓</span>
-                <span className="btn-text">Approve</span>
+                ✓
               </button>
-              
               <button 
-                className="action-btn edit-btn"
+                className="action-btn edit" 
                 onClick={handleEditClick}
-                title="Edit name before applying"
+                title="Edit name"
               >
-                <span className="btn-icon">✏️</span>
-                <span className="btn-text">Edit</span>
+                ✏️
               </button>
-              
               <button 
-                className="action-btn reject-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReject(file.id);
-                }}
+                className="action-btn reject" 
+                onClick={(e) => { e.stopPropagation(); onReject(file.id); }}
                 title="Reject rename"
               >
-                <span className="btn-icon">✗</span>
-                <span className="btn-text">Reject</span>
+                ✕
               </button>
             </>
           )}
           
           <button 
-            className="action-btn details-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDetails(!showDetails);
-            }}
+            className={`action-btn details ${showDetails ? 'active' : ''}`}
+            onClick={(e) => { e.stopPropagation(); setShowDetails(!showDetails); }}
             title="Toggle details"
           >
-            <span className={`btn-icon ${showDetails ? 'expanded' : ''}`}>▼</span>
+            ⌄
           </button>
         </div>
       </div>
       
-      {/* Expandable Details Section */}
       {showDetails && (
-        <div className="detailed-info">
-          <div className="detail-section">
-            <h4>AI Analysis</h4>
-            <p className="reasoning">{file.reasoning}</p>
-            {file.processing_time_ms && (
-              <span className="processing-time">
-                Analyzed in {file.processing_time_ms}ms
-              </span>
-            )}
+        <div className="card-details">
+          <div className="detail-row">
+            <strong>Analysis:</strong>
+            <span>{file.reasoning}</span>
           </div>
           
           {file.technical_tags && file.technical_tags.length > 0 && (
-            <div className="detail-section">
-              <h4>Technical Tags</h4>
-              <div className="tags-container">
-                {file.technical_tags.map((tag, index) => (
-                  <span key={index} className="tech-tag">
-                    {tag}
-                  </span>
+            <div className="detail-row">
+              <strong>Tags:</strong>
+              <div className="tags">
+                {file.technical_tags.map((tag, i) => (
+                  <span key={i} className="tag">{tag}</span>
                 ))}
               </div>
             </div>
           )}
           
           {file.extracted_entities && (
-            file.extracted_entities.team_size ||
-            file.extracted_entities.budget ||
-            file.extracted_entities.deadline ||
-            file.extracted_entities.company ||
-            file.extracted_entities.invoice_number ||
-            file.extracted_entities.amount ||
-            (file.extracted_entities.technology && file.extracted_entities.technology.length > 0)
-          ) && (
-            <div className="detail-section">
-              <h4>Extracted Information</h4>
-              <div className="entities-grid">
-                {file.extracted_entities.team_size && (
-                  <div className="entity-item">
-                    <span className="entity-icon">👥</span>
-                    <span className="entity-value">{file.extracted_entities.team_size}</span>
-                  </div>
-                )}
-                {file.extracted_entities.budget && (
-                  <div className="entity-item">
-                    <span className="entity-icon">💰</span>
-                    <span className="entity-value">{file.extracted_entities.budget}</span>
-                  </div>
-                )}
-                {file.extracted_entities.deadline && (
-                  <div className="entity-item">
-                    <span className="entity-icon">📅</span>
-                    <span className="entity-value">{file.extracted_entities.deadline}</span>
-                  </div>
-                )}
-                {file.extracted_entities.company && (
-                  <div className="entity-item">
-                    <span className="entity-icon">🏢</span>
-                    <span className="entity-value">{file.extracted_entities.company}</span>
-                  </div>
-                )}
-                {file.extracted_entities.invoice_number && (
-                  <div className="entity-item">
-                    <span className="entity-icon">📄</span>
-                    <span className="entity-value">{file.extracted_entities.invoice_number}</span>
-                  </div>
-                )}
-                {file.extracted_entities.amount && (
-                  <div className="entity-item">
-                    <span className="entity-icon">💵</span>
-                    <span className="entity-value">{file.extracted_entities.amount}</span>
-                  </div>
-                )}
-                {file.extracted_entities.technology && file.extracted_entities.technology.length > 0 && (
-                  <div className="entity-item">
-                    <span className="entity-icon">🔧</span>
-                    <span className="entity-value">{file.extracted_entities.technology.join(', ')}</span>
-                  </div>
-                )}
+            <div className="detail-row">
+              <strong>Extracted:</strong>
+              <div className="extracted-info">
+                {Object.entries(file.extracted_entities).map(([key, value]) => {
+                  if (!value || (Array.isArray(value) && value.length === 0)) return null;
+                  const displayValue = Array.isArray(value) ? value.join(', ') : value;
+                  return (
+                    <span key={key} className="extracted-item">
+                      {key.replace('_', ' ')}: {displayValue}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
           
+          {file.processing_time_ms && (
+            <div className="detail-row">
+              <strong>Processing:</strong>
+              <span>{file.processing_time_ms}ms</span>
+            </div>
+          )}
+          
           {file.error && (
-            <div className="detail-section error-section">
-              <h4>Error</h4>
-              <p className="error-message">{file.error}</p>
+            <div className="detail-row error">
+              <strong>Error:</strong>
+              <span>{file.error}</span>
             </div>
           )}
         </div>
