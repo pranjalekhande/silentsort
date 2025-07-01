@@ -6,8 +6,15 @@
   "scripts": {
     "dev": "cd apps/desktop && npm run dev",
     "build": "cd apps/desktop && npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "install:all": "npm install && cd apps/desktop && npm install"
+    "test": "cd apps/desktop && npm test",
+    "test:coverage": "cd apps/desktop && npm run test:coverage",
+    "lint": "cd apps/desktop && npm run lint",
+    "format:check": "cd apps/desktop && npm run format:check",
+    "format": "cd apps/desktop && npm run format",
+    "type-check": "cd apps/desktop && npm run type-check",
+    "benchmark": "cd apps/desktop && npm run benchmark || echo 'Benchmark not available yet'",
+    "install:all": "npm install && cd apps/desktop && npm install",
+    "postinstall": "npm run install:all"
   },
   "keywords": ["electron", "ai", "file-organization", "macos", "productivity"],
   "author": "pranjalekhande",
