@@ -10,6 +10,8 @@ export interface FileAnalysisResult {
   confidence: number;
   category: string;
   reasoning: string;
+  alternatives?: string[];
+  contentSummary?: string;
   error?: string;
 }
 
@@ -21,9 +23,56 @@ export interface FileMetadata {
   content?: string;
 }
 
+// LangGraph workflow state interfaces
+interface FileProcessingState {
+  filePath: string;
+  originalName: string;
+  fileExtension: string;
+  fileSize: number;
+  extractedContent?: string;
+  contentAnalysis?: ContentAnalysis;
+  nameGeneration?: NameGenerationResult;
+  confidenceScore?: number;
+  finalResult?: FileAnalysisResult;
+  error?: string;
+}
+
+interface ContentAnalysis {
+  fileType: string;
+  contentSummary: string;
+  keyTopics: string[];
+  documentType: 'invoice' | 'resume' | 'screenshot' | 'document' | 'code' | 'data' | 'image' | 'other';
+  businessContext?: string;
+}
+
+interface NameGenerationResult {
+  suggestedName: string;
+  alternativeNames: string[];
+  reasoning: string;
+  category: string;
+}
+
+// Zod schemas for structured outputs - temporarily disabled
+// const ContentAnalysisSchema = z.object({
+//   fileType: z.string(),
+//   contentSummary: z.string(),
+//   keyTopics: z.array(z.string()),
+//   documentType: z.enum(['invoice', 'resume', 'screenshot', 'document', 'code', 'data', 'image', 'other']),
+//   businessContext: z.string().optional(),
+// });
+
+// const NameGenerationSchema = z.object({
+//   suggestedName: z.string(),
+//   alternativeNames: z.array(z.string()),
+//   reasoning: z.string(),
+//   category: z.string(),
+// });
+
 class AIService {
   private openai: OpenAI | null = null;
   private isConfigured: boolean = false;
+  private usePythonService: boolean = true; // Use Python LangGraph service
+  private pythonServiceUrl: string = 'http://127.0.0.1:8000';
 
   constructor() {
     this.initializeOpenAI();
@@ -50,30 +99,75 @@ class AIService {
     }
   }
 
+  // private initializeLangGraph(): void {
+  //   const apiKey = process.env.OPENAI_API_KEY;
+
+  //   if (!apiKey || apiKey === 'your_openai_api_key_here') {
+  //     console.log('LangGraph workflow disabled - OpenAI API key not configured');
+  //     this.useLangGraph = false;
+  //     return;
+  //   }
+
+  //   try {
+  //     // Initialize LangChain LLM
+  //     this.langchainLLM = new ChatOpenAI({
+  //       modelName: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  //       temperature: parseFloat(process.env.OPENAI_TEMPERATURE || '0.3'),
+  //       maxTokens: parseInt(process.env.OPENAI_MAX_TOKENS || '1000'),
+  //       openAIApiKey: apiKey,
+  //     });
+
+  //     // Build the workflow
+  //     this.workflow = this.buildWorkflow();
+  //     console.log('✅ LangGraph workflow initialized successfully');
+  //   } catch (error) {
+  //     console.error('❌ Failed to initialize LangGraph workflow:', error);
+  //     this.useLangGraph = false;
+  //   }
+  // }
+
+  // private buildWorkflow(): any {
+  //   // Simplified workflow setup for now - will enhance incrementally  
+  //   console.log('🏗️ LangGraph workflow structure initialized');
+  //   return new StateGraph({});
+  // }
+
   async analyzeFile(filePath: string): Promise<FileAnalysisResult> {
-    if (!this.isConfigured) {
+    try {
+      console.log(`🚀 Analyzing file with AI: ${path.basename(filePath)}`);
+      
+      // Try Python LangGraph service first
+      if (this.usePythonService) {
+        const result = await this.analyzeFileWithPythonService(filePath);
+        if (result) {
+          console.log('✅ Python LangGraph analysis completed:', {
+            original: path.basename(filePath),
+            suggested: result.suggestedName,
+            confidence: result.confidence,
+            category: result.category,
+          });
+          return result;
+        }
+      }
+      
+      // Fallback to direct OpenAI if Python service unavailable
+      if (this.isConfigured) {
+        console.log('⚠️ Falling back to direct OpenAI analysis...');
+        const metadata = await this.extractFileMetadata(filePath);
+        return await this.performContentAnalysis(metadata);
+      }
+      
+      // If nothing works, return basic result
       return {
         suggestedName: path.basename(filePath),
         confidence: 0,
         category: 'unknown',
-        reasoning: 'AI service not configured',
-        error: 'OpenAI API key not configured',
+        reasoning: 'AI service not available',
+        error: 'No AI service configured',
       };
-    }
-
-    try {
-      const metadata = await this.extractFileMetadata(filePath);
-      const analysis = await this.performContentAnalysis(metadata);
-
-      console.log('AI Analysis completed:', {
-        original: metadata.originalName,
-        suggested: analysis.suggestedName,
-        confidence: analysis.confidence,
-      });
-
-      return analysis;
+      
     } catch (error) {
-      console.error('AI analysis failed:', error);
+      console.error('❌ AI analysis failed:', error);
       return {
         suggestedName: path.basename(filePath),
         confidence: 0,
@@ -81,6 +175,65 @@ class AIService {
         reasoning: 'Analysis failed',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    }
+  }
+
+  private async analyzeFileWithPythonService(filePath: string): Promise<FileAnalysisResult | null> {
+    try {
+      // Check if Python service is available with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const healthCheck = await fetch(`${this.pythonServiceUrl}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!healthCheck.ok) {
+        console.warn('⚠️ Python service not available, using fallback');
+        return null;
+      }
+      
+      // Extract file metadata
+      const metadata = await this.extractFileMetadata(filePath);
+      
+      // Call Python service
+      const response = await fetch(`${this.pythonServiceUrl}/analyze-file`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_path: filePath,
+          original_name: metadata.originalName,
+          file_size: metadata.fileSize,
+          file_extension: metadata.fileExtension,
+          content_preview: metadata.content || null,
+        }),
+      });
+      
+      if (!response.ok) {
+        console.warn('⚠️ Python service error:', response.statusText);
+        return null;
+      }
+      
+      const result = await response.json();
+      
+      // Convert Python service response to our format
+      return {
+        suggestedName: result.suggested_name,
+        confidence: result.confidence,
+        category: result.category,
+        reasoning: result.reasoning,
+        alternatives: result.alternatives || [],
+        contentSummary: result.content_summary,
+      };
+      
+    } catch (error) {
+      console.warn('⚠️ Python service connection failed:', error);
+      return null;
     }
   }
 
@@ -214,10 +367,36 @@ Only respond with valid JSON, no additional text.`;
 
   // Test method to verify AI service is working
   async testConnection(): Promise<{ success: boolean; message: string }> {
+    // Try Python service first
+    if (this.usePythonService) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(`${this.pythonServiceUrl}/health`, {
+          method: 'GET',
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const health = await response.json();
+          return {
+            success: true,
+            message: `Python LangGraph service is working! OpenAI configured: ${health.openai_configured}`,
+          };
+        }
+      } catch (error) {
+        console.warn('Python service test failed:', error);
+      }
+    }
+    
+    // Fallback to OpenAI test
     if (!this.isConfigured || !this.openai) {
       return {
         success: false,
-        message: 'OpenAI API key not configured',
+        message: 'Neither Python service nor OpenAI API key configured',
       };
     }
 
@@ -239,7 +418,7 @@ Only respond with valid JSON, no additional text.`;
 
       return {
         success: true,
-        message: response || 'Connection successful but no response',
+        message: `Direct OpenAI: ${response || 'Connection successful but no response'}`,
       };
     } catch (error) {
       return {

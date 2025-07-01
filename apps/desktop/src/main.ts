@@ -17,6 +17,8 @@ class SilentSortApp {
   private mainWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
   private fileWatcher: chokidar.FSWatcher | null = null;
+  private processingCache: Map<string, number> = new Map(); // filepath -> timestamp
+  private readonly CACHE_DURATION = 5000; // 5 seconds
 
   constructor() {
     this.setupApp();
@@ -35,6 +37,7 @@ class SilentSortApp {
     this.setupFileWatcher();
     this.setupGlobalShortcuts();
     this.setupEventHandlers();
+    this.setupCacheCleanup();
   }
 
   private createMainWindow(): void {
@@ -130,6 +133,17 @@ class SilentSortApp {
       if (path.basename(filePath).startsWith('.')) {
         return;
       }
+
+      // Check if file was recently processed to prevent duplicates
+      const now = Date.now();
+      const lastProcessed = this.processingCache.get(filePath);
+      if (lastProcessed && (now - lastProcessed) < this.CACHE_DURATION) {
+        console.log('⏭️ Skipping recently processed file:', path.basename(filePath));
+        return;
+      }
+
+      // Mark file as being processed
+      this.processingCache.set(filePath, now);
 
       console.log('🤖 Auto-processing file with AI:', filePath);
 
@@ -269,6 +283,18 @@ class SilentSortApp {
       this.mainWindow.show();
       this.mainWindow.focus();
     }
+  }
+
+  private setupCacheCleanup(): void {
+    // Clean up old entries from processing cache every minute
+    setInterval(() => {
+      const now = Date.now();
+      for (const [filePath, timestamp] of this.processingCache.entries()) {
+        if (now - timestamp > this.CACHE_DURATION * 2) {
+          this.processingCache.delete(filePath);
+        }
+      }
+    }, 60000); // Clean up every minute
   }
 }
 
