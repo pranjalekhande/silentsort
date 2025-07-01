@@ -152,7 +152,7 @@ class SilentSortApp {
       console.log('✅ AI auto-analysis completed:', aiResult);
 
       // Send file with AI analysis to renderer
-      if (this.mainWindow) {
+      if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
         this.mainWindow.webContents.send('new-file-detected', {
           filePath,
           aiResult,
@@ -162,7 +162,7 @@ class SilentSortApp {
       console.error('❌ Error processing file:', error);
 
       // Send file with error to renderer
-      if (this.mainWindow) {
+      if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
         this.mainWindow.webContents.send('new-file-detected', {
           filePath,
           aiResult: {
@@ -182,7 +182,7 @@ class SilentSortApp {
     globalShortcut.register('CommandOrControl+Shift+F', () => {
       this.showMainWindow();
       // Focus search input
-      if (this.mainWindow) {
+      if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
         this.mainWindow.webContents.send('focus-search');
       }
     });
