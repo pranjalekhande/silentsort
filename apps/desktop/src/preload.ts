@@ -15,11 +15,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AI testing
   testAIService: () => ipcRenderer.invoke('test-ai-service'),
 
+  // Cache statistics
+  getCacheStats: () => ipcRenderer.invoke('get-cache-stats'),
+
   // Event listeners
   onNewFileDetected: (
     callback: (data: { filePath: string; aiResult: AIResult }) => void
   ) => {
-    ipcRenderer.on('new-file-detected', (event, data) => callback(data));
+    console.log('🔍 PRELOAD: Setting up new-file-detected listener');
+    ipcRenderer.on('new-file-detected', (event, data) => {
+      console.log('🔍 PRELOAD: Received new-file-detected event:', data);
+      callback(data);
+    });
   },
 
   onFocusSearch: (callback: () => void) => {

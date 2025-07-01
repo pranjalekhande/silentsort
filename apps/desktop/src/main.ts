@@ -17,8 +17,9 @@ class SilentSortApp {
   private mainWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
   private fileWatcher: chokidar.FSWatcher | null = null;
-  private processingCache: Map<string, number> = new Map(); // filepath -> timestamp
-  private readonly CACHE_DURATION = 5000; // 5 seconds
+  private processingCache: Map<string, { timestamp: number; status: 'processing' | 'completed' | 'failed' }> = new Map();
+  private readonly CACHE_DURATION = 10000; // Increased to 10 seconds
+  private readonly PROCESSING_TIMEOUT = 30000; // 30 seconds timeout for stuck processing
 
   constructor() {
     this.setupApp();
@@ -131,25 +132,70 @@ class SilentSortApp {
     try {
       // Skip hidden files and directories
       if (path.basename(filePath).startsWith('.')) {
+        console.log('⏭️ Skipping hidden file:', path.basename(filePath));
+        return;
+      }
+
+      // Skip system/temp files
+      const fileName = path.basename(filePath);
+      if (fileName.includes('.tmp') || fileName.includes('~') || fileName.startsWith('._')) {
+        console.log('⏭️ Skipping system/temp file:', fileName);
         return;
       }
 
       // Check if file was recently processed to prevent duplicates
       const now = Date.now();
-      const lastProcessed = this.processingCache.get(filePath);
-      if (lastProcessed && (now - lastProcessed) < this.CACHE_DURATION) {
-        console.log('⏭️ Skipping recently processed file:', path.basename(filePath));
+      const cacheEntry = this.processingCache.get(filePath);
+      
+      if (cacheEntry) {
+        const timeSinceProcessed = now - cacheEntry.timestamp;
+        
+        // If currently processing, skip
+        if (cacheEntry.status === 'processing' && timeSinceProcessed < this.PROCESSING_TIMEOUT) {
+          console.log('⏳ File is currently being processed:', fileName);
+          return;
+        }
+        
+        // If recently completed, skip
+        if (cacheEntry.status === 'completed' && timeSinceProcessed < this.CACHE_DURATION) {
+          console.log('⏭️ Skipping recently processed file:', fileName, `(${Math.round(timeSinceProcessed/1000)}s ago)`);
+          return;
+        }
+        
+        // If failed recently but not too long ago, skip to avoid spam
+        if (cacheEntry.status === 'failed' && timeSinceProcessed < (this.CACHE_DURATION / 2)) {
+          console.log('⏭️ Skipping recently failed file:', fileName);
+          return;
+        }
+      }
+
+      // Check if file actually exists and is readable
+      const fs = require('fs').promises;
+      try {
+        const stats = await fs.stat(filePath);
+        if (!stats.isFile()) {
+          console.log('⏭️ Skipping non-file:', fileName);
+          return;
+        }
+        
+        // Skip very large files (>50MB) to prevent memory issues
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        if (stats.size > maxSize) {
+          console.log('⏭️ Skipping large file:', fileName, `(${Math.round(stats.size / 1024 / 1024)}MB)`);
+          return;
+        }
+      } catch (statError) {
+        console.log('⏭️ File no longer exists or not accessible:', fileName);
         return;
       }
 
       // Mark file as being processed
-      this.processingCache.set(filePath, now);
+      this.processingCache.set(filePath, { timestamp: now, status: 'processing' });
+      console.log('🤖 Processing file with AI:', fileName);
 
-      console.log('🤖 Auto-processing file with AI:', filePath);
-
-      // Process file with AI immediately
+      // Process file with AI
       const aiResult = await aiService.analyzeFile(filePath);
-      console.log('✅ AI auto-analysis completed:', aiResult);
+      console.log('✅ AI analysis completed for:', fileName, '- Confidence:', aiResult.confidence);
 
       // Send file with AI analysis to renderer
       if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
@@ -158,8 +204,13 @@ class SilentSortApp {
           aiResult,
         });
       }
+
+      // Mark file as completed
+      this.processingCache.set(filePath, { timestamp: now, status: 'completed' });
+      console.log('📋 File processing cache updated:', fileName, 'status: completed');
+      
     } catch (error) {
-      console.error('❌ Error processing file:', error);
+      console.error('❌ Error processing file:', path.basename(filePath), error instanceof Error ? error.message : error);
 
       // Send file with error to renderer
       if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
@@ -174,6 +225,10 @@ class SilentSortApp {
           },
         });
       }
+
+      // Mark file as failed
+      this.processingCache.set(filePath, { timestamp: Date.now(), status: 'failed' });
+      console.log('📋 File processing cache updated:', path.basename(filePath), 'status: failed');
     }
   }
 
@@ -214,6 +269,13 @@ class SilentSortApp {
       const result = await aiService.testConnection();
       console.log('🔍 AI Service Test Result:', result);
       return result;
+    });
+
+    // Get processing cache statistics
+    ipcMain.handle('get-cache-stats', async () => {
+      const stats = this.getCacheStatistics();
+      console.log('📊 Cache Statistics:', stats);
+      return stats;
     });
 
     ipcMain.handle(
@@ -289,12 +351,37 @@ class SilentSortApp {
     // Clean up old entries from processing cache every minute
     setInterval(() => {
       const now = Date.now();
-      for (const [filePath, timestamp] of this.processingCache.entries()) {
-        if (now - timestamp > this.CACHE_DURATION * 2) {
+      for (const [filePath, { timestamp, status }] of this.processingCache.entries()) {
+        if (status === 'failed' || (now - timestamp > this.PROCESSING_TIMEOUT)) {
           this.processingCache.delete(filePath);
         }
       }
     }, 60000); // Clean up every minute
+  }
+
+  private getCacheStatistics(): { totalFiles: number; processingFiles: number; completedFiles: number; failedFiles: number } {
+    let totalFiles = 0;
+    let processingFiles = 0;
+    let completedFiles = 0;
+    let failedFiles = 0;
+
+    for (const [filePath, { status }] of this.processingCache.entries()) {
+      totalFiles++;
+      if (status === 'processing') {
+        processingFiles++;
+      } else if (status === 'completed') {
+        completedFiles++;
+      } else if (status === 'failed') {
+        failedFiles++;
+      }
+    }
+
+    return {
+      totalFiles,
+      processingFiles,
+      completedFiles,
+      failedFiles,
+    };
   }
 }
 

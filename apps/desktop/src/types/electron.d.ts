@@ -30,6 +30,13 @@ export interface RenameResult {
   error?: string;
 }
 
+export interface CacheStats {
+  totalFiles: number;
+  processingFiles: number;
+  completedFiles: number;
+  failedFiles: number;
+}
+
 export interface ElectronAPI {
   // File operations
   processFileContent: (filePath: string) => Promise<AIResult>;
@@ -37,6 +44,9 @@ export interface ElectronAPI {
   
   // AI service
   testAIService: () => Promise<TestResult>;
+  
+  // Cache statistics
+  getCacheStats: () => Promise<CacheStats>;
   
   // Event listeners
   onNewFileDetected: (callback: (data: { filePath: string; aiResult: AIResult }) => void) => void;

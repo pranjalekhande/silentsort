@@ -36,6 +36,12 @@ const App: React.FC = () => {
     message: string;
   } | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('Checking API...');
+  const [cacheStats, setCacheStats] = useState<{
+    totalFiles: number;
+    processingFiles: number;
+    completedFiles: number;
+    failedFiles: number;
+  } | null>(null);
 
   useEffect(() => {
     // Debug electronAPI availability
@@ -114,6 +120,32 @@ const App: React.FC = () => {
           (error instanceof Error ? error.message : 'Unknown error'),
       });
     }
+  };
+
+  const handleGetCacheStats = async () => {
+    if (!window.electronAPI?.getCacheStats) {
+      console.error('❌ getCacheStats not available');
+      return;
+    }
+
+    try {
+      const stats = await window.electronAPI.getCacheStats();
+      console.log('📊 Cache Stats:', stats);
+      setCacheStats(stats);
+    } catch (error) {
+      console.error('❌ Failed to get cache stats:', error);
+    }
+  };
+
+  const handleCreateTestFile = () => {
+    const testContent = `Test file created at ${new Date().toISOString()}\nThis is a test file to trigger AI processing.`;
+    const testFileName = `test-ui-file-${Date.now()}.txt`;
+    
+    // Create a test file in the watched directory
+    console.log('🔧 Creating test file:', testFileName);
+    
+    // For now, just show instructions since we can't directly create files from renderer
+    alert(`Please manually create a file in ~/Downloads/silentsort-test/ named "${testFileName}" with any content to test the UI integration.`);
   };
 
   const handleNewFileWithAI = async (filePath: string, aiResult: any) => {
@@ -277,11 +309,38 @@ const App: React.FC = () => {
           <button onClick={handleTestAI} className='test-ai-btn'>
             🧪 Test AI Connection
           </button>
+          
+          <button onClick={handleGetCacheStats} className='test-ai-btn'>
+            📊 Get Cache Stats
+          </button>
+          
+          <button onClick={handleCreateTestFile} className='test-ai-btn'>
+            📄 Create Test File
+          </button>
+          
           {aiTestResult && (
             <div
               className={`test-result ${aiTestResult.success ? 'success' : 'error'}`}
             >
               {aiTestResult.success ? '✅' : '❌'} {aiTestResult.message}
+            </div>
+          )}
+
+          {cacheStats && (
+            <div className='cache-stats' style={{ 
+              marginTop: '10px', 
+              padding: '10px', 
+              border: '1px solid #ddd', 
+              borderRadius: '4px',
+              fontSize: '0.9rem'
+            }}>
+              <strong>📊 Cache Statistics:</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '5px' }}>
+                <span>📁 Total Files: {cacheStats.totalFiles}</span>
+                <span>⏳ Processing: {cacheStats.processingFiles}</span>
+                <span>✅ Completed: {cacheStats.completedFiles}</span>
+                <span>❌ Failed: {cacheStats.failedFiles}</span>
+              </div>
             </div>
           )}
 
