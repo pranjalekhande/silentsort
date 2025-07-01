@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
+import { formatDetectionWorkflow, FormatDetectionResult } from './format-detection-workflow';
 
 // Load environment variables
 require('dotenv').config();
@@ -150,6 +151,8 @@ class AIService {
     try {
       console.log(`🚀 Analyzing file with AI: ${path.basename(filePath)}`);
       
+      let aiResult: FileAnalysisResult;
+      
       // Try Python LangGraph service first
       if (this.usePythonService) {
         const result = await this.analyzeFileWithPythonService(filePath);
@@ -160,25 +163,45 @@ class AIService {
             confidence: result.confidence,
             category: result.category,
           });
-          return result;
+          aiResult = result;
+        } else {
+          // Fallback to direct OpenAI if Python service unavailable
+          if (this.isConfigured) {
+            console.log('⚠️ Falling back to direct OpenAI analysis...');
+            const metadata = await this.extractFileMetadata(filePath);
+            aiResult = await this.performContentAnalysis(metadata);
+          } else {
+            // If nothing works, return basic result
+            aiResult = {
+              suggestedName: path.basename(filePath),
+              confidence: 0,
+              category: 'unknown',
+              reasoning: 'AI service not available',
+              error: 'No AI service configured',
+            };
+          }
+        }
+      } else {
+        // Direct OpenAI path
+        if (this.isConfigured) {
+          const metadata = await this.extractFileMetadata(filePath);
+          aiResult = await this.performContentAnalysis(metadata);
+        } else {
+          aiResult = {
+            suggestedName: path.basename(filePath),
+            confidence: 0,
+            category: 'unknown',
+            reasoning: 'AI service not available',
+            error: 'No AI service configured',
+          };
         }
       }
       
-      // Fallback to direct OpenAI if Python service unavailable
-      if (this.isConfigured) {
-        console.log('⚠️ Falling back to direct OpenAI analysis...');
-        const metadata = await this.extractFileMetadata(filePath);
-        return await this.performContentAnalysis(metadata);
-      }
+      // 🎯 Apply Smart Format Detection & Application
+      console.log('🎨 Applying format detection workflow...');
+      const formatResult = await this.applyFormatDetection(filePath, aiResult);
       
-      // If nothing works, return basic result
-      return {
-        suggestedName: path.basename(filePath),
-        confidence: 0,
-        category: 'unknown',
-        reasoning: 'AI service not available',
-        error: 'No AI service configured',
-      };
+      return formatResult;
       
     } catch (error) {
       console.error('❌ AI analysis failed:', error);
@@ -380,6 +403,51 @@ Only respond with valid JSON, no additional text.`;
         reasoning: 'Failed to parse AI response',
         error: 'Invalid JSON response from AI',
       };
+    }
+  }
+
+  // 🎯 Smart Format Detection Integration
+  private async applyFormatDetection(filePath: string, aiResult: FileAnalysisResult): Promise<FileAnalysisResult> {
+    try {
+      const targetFolder = path.dirname(filePath);
+      const originalFileName = path.basename(filePath);
+      
+      // Run the LangGraph format detection workflow
+      const formatResult = await formatDetectionWorkflow.processFile({
+        suggestedName: aiResult.suggestedName,
+        targetFolder,
+        originalFileName
+      });
+      
+      if (formatResult.success) {
+        console.log('✅ Format detection completed:', {
+          original: aiResult.suggestedName,
+          formatted: formatResult.finalName,
+          pattern: formatResult.dominantPattern?.convention.type,
+          confidence: formatResult.confidence
+        });
+        
+        // Enhance the AI result with format detection insights
+        return {
+          ...aiResult,
+          suggestedName: formatResult.finalName,
+          alternatives: [
+            ...(aiResult.alternatives || []),
+            ...formatResult.alternativeFormats
+          ].slice(0, 5), // Keep top 5 alternatives
+          confidence: Math.min(aiResult.confidence, formatResult.confidence), // Use lower confidence
+          reasoning: `${aiResult.reasoning} | Format: Applied ${formatResult.dominantPattern?.convention.type || 'default'} naming convention based on folder analysis.`,
+          processing_time_ms: (aiResult.processing_time_ms || 0) + formatResult.processingTimeMs
+        };
+      } else {
+        console.warn('⚠️ Format detection failed, using original result:', formatResult.error);
+        return aiResult;
+      }
+      
+    } catch (error) {
+      console.error('❌ Format detection workflow failed:', error);
+      // Return original AI result if format detection fails
+      return aiResult;
     }
   }
 
