@@ -40,6 +40,8 @@ const ImprovedApp: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showBatchOperations, setShowBatchOperations] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [currentFolder, setCurrentFolder] = useState<string>('');
+  const [isFirstRun, setIsFirstRun] = useState<boolean>(true);
 
   // Stats calculations
   const pendingFiles = files.filter(f => f.status === 'pending');
@@ -47,8 +49,17 @@ const ImprovedApp: React.FC = () => {
   const highConfidenceFiles = pendingFiles.filter(f => f.confidence >= 0.8);
 
   useEffect(() => {
-    // Listen for new files detected by the main process
+    // Check first run and get current folder
     if (window.electronAPI) {
+      window.electronAPI.isFirstRun().then(firstRun => {
+        setIsFirstRun(firstRun);
+      });
+
+      window.electronAPI.getCurrentFolder().then(folder => {
+        setCurrentFolder(folder);
+      });
+
+      // Listen for new files detected by the main process
       window.electronAPI.onNewFileDetected(
         (data: { filePath: string; aiResult: AIResult }) => {
           handleNewFileWithAI(data.filePath, data.aiResult);
@@ -186,6 +197,23 @@ const ImprovedApp: React.FC = () => {
     }
   };
 
+  const handleSelectFolder = async () => {
+    if (!window.electronAPI?.selectFolder) {
+      return;
+    }
+
+    try {
+      const result = await window.electronAPI.selectFolder();
+      
+      if (result.success && result.folderPath) {
+        setCurrentFolder(result.folderPath);
+        setIsFirstRun(false);
+      }
+    } catch (error) {
+      // Silent error handling for better UX
+    }
+  };
+
   const filteredFiles = pendingFiles.filter(file => {
     if (!searchQuery) {
       return true;
@@ -221,12 +249,101 @@ const ImprovedApp: React.FC = () => {
         <section className="priority-section">
           {pendingFiles.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">📁</div>
-              <h2>All caught up!</h2>
-              <p>No files waiting for review. Drop files in your monitored folder to get started.</p>
-              <button onClick={handleTestAI} className="test-ai-link">
-                Test AI Connection
-              </button>
+              <div className="empty-icon">🤖</div>
+              {isFirstRun ? (
+                <div className="welcome-content">
+                  <h2>Welcome to SilentSort!</h2>
+                  <p className="welcome-subtitle">Your AI-powered file organization assistant</p>
+                  
+                  <div className="feature-grid">
+                    <div className="feature-card">
+                      <div className="feature-icon">🧠</div>
+                      <h3>Smart Analysis</h3>
+                      <p>AI reads your file content to understand what it is and suggests meaningful names</p>
+                    </div>
+                    
+                    <div className="feature-card">
+                      <div className="feature-icon">⚡</div>
+                      <h3>Auto Organization</h3>
+                      <p>Automatically detects new files and processes them in the background</p>
+                    </div>
+                    
+                    <div className="feature-card">
+                      <div className="feature-icon">✅</div>
+                      <h3>You Control</h3>
+                      <p>Review and approve AI suggestions before any changes are made</p>
+                    </div>
+                  </div>
+                  
+                  <div className="getting-started">
+                    <h3>Getting Started</h3>
+                    <div className="steps">
+                      <div className="step">
+                        <span className="step-number">1</span>
+                        <span>Choose a folder to monitor (Downloads, Documents, etc.)</span>
+                      </div>
+                      <div className="step">
+                        <span className="step-number">2</span>
+                        <span>Drop files in that folder or let existing files be detected</span>
+                      </div>
+                      <div className="step">
+                        <span className="step-number">3</span>
+                        <span>Review AI suggestions and approve the ones you like</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button onClick={handleSelectFolder} className="primary-action-btn">
+                    📁 Choose Folder to Monitor
+                  </button>
+                </div>
+              ) : (
+                <div className="ready-content">
+                  <h2>Ready to organize!</h2>
+                  <p className="subtitle">SilentSort is monitoring: <strong>{currentFolder}</strong></p>
+                  
+                  <div className="info-cards">
+                    <div className="info-card">
+                      <h3>🎯 How it works</h3>
+                      <ul>
+                        <li>Drop files in your monitored folder</li>
+                        <li>AI analyzes content and suggests better names</li>
+                        <li>Review suggestions here and approve the good ones</li>
+                        <li>Use ⌘⇧F anywhere to quickly search files</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="info-card">
+                      <h3>📝 Supported Files</h3>
+                      <ul>
+                        <li><strong>PDFs:</strong> Resumes, invoices, reports, contracts</li>
+                        <li><strong>Documents:</strong> Word docs, text files, presentations</li>
+                        <li><strong>Images:</strong> Screenshots, photos, diagrams</li>
+                        <li><strong>Code:</strong> Scripts, source files, configs</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="info-card">
+                      <h3>⚡ Pro Tips</h3>
+                      <ul>
+                        <li>Use batch operations for multiple files</li>
+                        <li>High confidence suggestions (80%+) are usually accurate</li>
+                        <li>Search by content, categories, or file names</li>
+                        <li>AI learns from your approval patterns</li>
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  <div className="action-buttons">
+                    <button onClick={handleTestAI} className="secondary-action-btn">
+                      🧪 Test AI Connection
+                    </button>
+                    <button onClick={handleSelectFolder} className="secondary-action-btn">
+                      📁 Change Folder
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -323,7 +440,10 @@ const ImprovedApp: React.FC = () => {
               </div>
               <div className="settings-section">
                 <h3>File Monitoring</h3>
-                <p>Currently monitoring: ~/Downloads/silentsort-test/</p>
+                <p>Currently monitoring: {currentFolder || 'No folder selected'}</p>
+                <button onClick={handleSelectFolder} className="test-ai-btn">
+                  📁 Choose Folder to Monitor
+                </button>
               </div>
             </div>
           </div>

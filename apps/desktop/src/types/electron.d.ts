@@ -37,6 +37,11 @@ export interface CacheStats {
   failedFiles: number;
 }
 
+export interface FolderSelectionResult {
+  success: boolean;
+  folderPath: string | null;
+}
+
 export interface ElectronAPI {
   // File operations
   processFileContent: (filePath: string) => Promise<AIResult>;
@@ -47,6 +52,11 @@ export interface ElectronAPI {
   
   // Cache statistics
   getCacheStats: () => Promise<CacheStats>;
+  
+  // Folder selection
+  selectFolder: () => Promise<FolderSelectionResult>;
+  getCurrentFolder: () => Promise<string>;
+  isFirstRun: () => Promise<boolean>;
   
   // Event listeners
   onNewFileDetected: (callback: (data: { filePath: string; aiResult: AIResult }) => void) => void;

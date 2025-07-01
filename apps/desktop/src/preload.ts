@@ -18,6 +18,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Cache statistics
   getCacheStats: () => ipcRenderer.invoke('get-cache-stats'),
 
+  // Folder selection
+  selectFolder: () => ipcRenderer.invoke('select-folder'),
+  getCurrentFolder: () => ipcRenderer.invoke('get-current-folder'),
+  isFirstRun: () => ipcRenderer.invoke('is-first-run'),
+
   // Event listeners
   onNewFileDetected: (
     callback: (data: { filePath: string; aiResult: AIResult }) => void

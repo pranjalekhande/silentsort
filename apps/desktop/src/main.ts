@@ -5,13 +5,80 @@ import {
   Menu,
   Tray,
   globalShortcut,
+  dialog,
 } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as chokidar from 'chokidar';
 import { aiService } from './services/ai-service';
 
 // Load environment variables
 require('dotenv').config();
+
+// Simple settings management
+interface Settings {
+  watchFolder: string;
+  isFirstRun: boolean;
+}
+
+class SimpleStore {
+  private settingsPath: string;
+  private settings: Settings = {
+    watchFolder: path.join(require('os').homedir(), 'Downloads'),
+    isFirstRun: true,
+  };
+
+  constructor() {
+    const userDataPath = app.getPath('userData');
+    this.settingsPath = path.join(userDataPath, 'settings.json');
+    this.loadSettings();
+  }
+
+  private loadSettings(): void {
+    try {
+      if (fs.existsSync(this.settingsPath)) {
+        const data = fs.readFileSync(this.settingsPath, 'utf8');
+        this.settings = JSON.parse(data);
+      } else {
+        // Default settings
+        this.settings = {
+          watchFolder: path.join(require('os').homedir(), 'Downloads'),
+          isFirstRun: true,
+        };
+        this.saveSettings();
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      this.settings = {
+        watchFolder: path.join(require('os').homedir(), 'Downloads'),
+        isFirstRun: true,
+      };
+    }
+  }
+
+  private saveSettings(): void {
+    try {
+      const userDataPath = app.getPath('userData');
+      if (!fs.existsSync(userDataPath)) {
+        fs.mkdirSync(userDataPath, { recursive: true });
+      }
+      fs.writeFileSync(this.settingsPath, JSON.stringify(this.settings, null, 2));
+    } catch (error) {
+      console.error('Error saving settings:', error);
+    }
+  }
+
+  get<K extends keyof Settings>(key: K): Settings[K] {
+    return this.settings[key];
+  }
+
+  set<K extends keyof Settings>(key: K, value: Settings[K]): void {
+    this.settings[key] = value;
+    this.saveSettings();
+  }
+}
+
+let store: SimpleStore;
 
 class SilentSortApp {
   private mainWindow: BrowserWindow | null = null;
@@ -27,6 +94,10 @@ class SilentSortApp {
 
   private async setupApp(): Promise<void> {
     await app.whenReady();
+
+    // Initialize simple settings store
+    store = new SimpleStore();
+    console.log('✅ Settings store initialized');
 
     // Test AI service on startup
     console.log('🧪 Testing AI service connection...');
@@ -102,12 +173,22 @@ class SilentSortApp {
   }
 
   private setupFileWatcher(): void {
-    // Watch only our test folder for now
-    const watchPaths = [
-      path.join(require('os').homedir(), 'Downloads', 'silentsort-test'),
-    ];
+    // Ensure store is initialized
+    if (!store) {
+      console.error('❌ Store not initialized, cannot setup file watcher');
+      return;
+    }
 
-    console.log('Setting up file watcher for TEST folder:', watchPaths);
+    // Get user-selected folder or default to Downloads
+    const watchFolder = store.get('watchFolder') as string;
+    const watchPaths = [watchFolder];
+
+    console.log('Setting up file watcher for user folder:', watchPaths);
+
+    // Close existing watcher if any
+    if (this.fileWatcher) {
+      this.fileWatcher.close();
+    }
 
     this.fileWatcher = chokidar.watch(watchPaths, {
       ignoreInitial: false,
@@ -276,6 +357,37 @@ class SilentSortApp {
       const stats = this.getCacheStatistics();
       console.log('📊 Cache Statistics:', stats);
       return stats;
+    });
+
+    // Folder selection handlers
+    ipcMain.handle('select-folder', async () => {
+      const result = await dialog.showOpenDialog(this.mainWindow!, {
+        properties: ['openDirectory'],
+        title: 'Select folder to monitor',
+        buttonLabel: 'Select Folder',
+      });
+
+      if (!result.canceled && result.filePaths.length > 0) {
+        const selectedFolder = result.filePaths[0];
+        store.set('watchFolder', selectedFolder);
+        store.set('isFirstRun', false);
+        
+        // Restart file watcher with new folder
+        this.setupFileWatcher();
+        
+        console.log('✅ User selected folder:', selectedFolder);
+        return { success: true, folderPath: selectedFolder };
+      }
+      
+      return { success: false, folderPath: null };
+    });
+
+    ipcMain.handle('get-current-folder', async () => {
+      return store.get('watchFolder');
+    });
+
+    ipcMain.handle('is-first-run', async () => {
+      return store.get('isFirstRun');
     });
 
     ipcMain.handle(
