@@ -1,0 +1,10 @@
+# Core API dependencies
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-dotenv>=1.0.0
+
+# AI dependencies
+openai>=1.0.0
+
+# Basic utilities
+pydantic>=2.0.0 
