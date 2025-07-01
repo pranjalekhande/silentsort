@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { AIResult } from './types/electron';
 
 console.log('🔍 PRELOAD: Script starting...');
 
@@ -16,7 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Event listeners
   onNewFileDetected: (
-    callback: (data: { filePath: string; aiResult: any }) => void
+    callback: (data: { filePath: string; aiResult: AIResult }) => void
   ) => {
     ipcRenderer.on('new-file-detected', (event, data) => callback(data));
   },
@@ -41,29 +42,4 @@ window.addEventListener('DOMContentLoaded', () => {
   );
 });
 
-// Type definitions for the exposed API
-export interface ElectronAPI {
-  processFileContent: (filePath: string) => Promise<{
-    suggestedName: string;
-    confidence: number;
-    category: string;
-    reasoning: string;
-    error?: string;
-  }>;
-  renameFile: (
-    oldPath: string,
-    newPath: string
-  ) => Promise<{ success: boolean; message?: string }>;
-  testAIService: () => Promise<{ success: boolean; message: string }>;
-  onNewFileDetected: (
-    callback: (data: { filePath: string; aiResult: any }) => void
-  ) => void;
-  onFocusSearch: (callback: () => void) => void;
-  removeAllListeners: (channel: string) => void;
-}
-
-declare global {
-  interface Window {
-    electronAPI: ElectronAPI;
-  }
-}
+// Types are defined in ./types/electron.d.ts
