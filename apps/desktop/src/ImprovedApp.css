@@ -527,9 +527,9 @@
   100% { transform: rotate(360deg); }
 }
 
-/* File Groups - Updated for dark theme */
+/* File Groups - Ultra-compact macOS-style design */
 .file-group {
-  margin-bottom: 32px;
+  margin-bottom: 16px;
 }
 
 .file-group:last-child {
@@ -537,67 +537,145 @@
 }
 
 .group-header {
-  margin-bottom: 16px;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #2a2a2a 0%, #252525 100%);
-  border: 2px solid #444;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 28px;
+}
+
+.group-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.group-header-content {
+  flex: 1;
+}
+
+.group-toggle-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+}
+
+.group-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #999;
+}
+
+.toggle-icon {
+  transition: transform 0.15s ease;
+  font-size: 8px;
+  font-weight: 400;
+}
+
+.toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.toggle-icon.expanded {
+  transform: rotate(0deg);
 }
 
 .group-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;
-  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #bbb;
+  margin: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  letter-spacing: -0.02em;
 }
 
 .group-icon {
-  font-size: 20px;
+  font-size: 12px;
 }
 
 .group-subtitle {
-  font-size: 14px;
-  color: #ccc;
+  font-size: 10px;
+  color: #777;
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.2;
 }
 
-/* Duplicate group styling */
+/* Duplicate group styling - very subtle red accent */
 .duplicate-group .group-header {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(255, 59, 48, 0.02);
+  border-color: rgba(255, 59, 48, 0.04);
+}
+
+.duplicate-group .group-header:hover {
+  background: rgba(255, 59, 48, 0.03);
+  border-color: rgba(255, 59, 48, 0.06);
 }
 
 .duplicate-group .group-title {
-  color: #ff6b6b;
+  color: #d4998a;
 }
 
 .duplicate-group .group-subtitle {
-  color: #ffaaaa;
+  color: #998877;
 }
 
-/* Regular group styling */
+.duplicate-group .group-toggle-btn {
+  color: #aa7766;
+}
+
+.duplicate-group .group-toggle-btn:hover {
+  background: rgba(255, 59, 48, 0.06);
+  color: #d4998a;
+}
+
+/* Regular group styling - very subtle blue accent */
 .regular-group .group-header {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(29, 78, 216, 0.1) 100%);
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(0, 122, 255, 0.02);
+  border-color: rgba(0, 122, 255, 0.04);
+}
+
+.regular-group .group-header:hover {
+  background: rgba(0, 122, 255, 0.03);
+  border-color: rgba(0, 122, 255, 0.06);
 }
 
 .regular-group .group-title {
-  color: #6eb5ff;
+  color: #8ab4d4;
 }
 
 .regular-group .group-subtitle {
-  color: #aad4ff;
+  color: #778899;
+}
+
+.regular-group .group-toggle-btn {
+  color: #6677aa;
+}
+
+.regular-group .group-toggle-btn:hover {
+  background: rgba(0, 122, 255, 0.06);
+  color: #8ab4d4;
 }
 
 .file-group .files-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
 /* Responsive Design */

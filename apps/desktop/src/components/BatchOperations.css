@@ -1,160 +1,307 @@
-/* Compact Batch Operations */
+/* Ultra-compact Gmail-like Batch Operations */
 .batch-operations {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.batch-header {
-  margin-bottom: 12px;
-}
-
-.batch-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-}
-
-.selected-count {
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.high-confidence-note {
-  color: #059669;
-  font-weight: 500;
-  background: #dcfce7;
-  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 4px;
-  font-size: 11px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
 }
 
-.batch-controls {
+.batch-operations.has-selection {
+  background: rgba(66, 133, 244, 0.06);
+  border-color: rgba(66, 133, 244, 0.15);
+  box-shadow: 0 1px 4px rgba(66, 133, 244, 0.08);
+}
+
+.batch-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+}
+
+.select-all-section {
+  flex-shrink: 0;
+}
+
+.select-all-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.select-all-checkbox {
+  width: 16px;
+  height: 16px;
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.select-all-checkbox:hover:not(:disabled) {
+  border-color: rgba(66, 133, 244, 0.6);
+  background: rgba(66, 133, 244, 0.05);
+}
+
+.select-all-checkbox:checked {
+  background: #4285f4;
+  border-color: #4285f4;
+}
+
+.select-all-checkbox:checked::after {
+  content: '✓';
+  color: white;
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 1;
+  position: absolute;
+}
+
+.select-all-checkbox.partially-selected {
+  background: #4285f4;
+  border-color: #4285f4;
+}
+
+.select-all-checkbox.partially-selected::after {
+  content: '−';
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1;
+  position: absolute;
+}
+
+.select-all-checkbox:disabled {
+  border-color: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.select-all-checkbox:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.3);
+}
+
+.select-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #bbb;
+  min-width: 16px;
+  text-align: center;
+  transition: color 0.15s ease;
+}
+
+.batch-operations.has-selection .select-count {
+  color: #4285f4;
+}
+
+.batch-controls {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.action-section {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .selection-controls {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .action-controls {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+.clear-selection-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.clear-selection-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #999;
 }
 
 .batch-btn {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 4px 8px;
   border: none;
-  border-radius: 5px;
+  border-radius: 4px;
   font-weight: 500;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 32px;
+  transition: all 0.15s ease;
+  min-height: 24px;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 .batch-btn.select-btn {
-  background: #f8fafc;
-  color: #6b7280;
-  border: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.04);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .batch-btn.select-btn:hover:not(:disabled) {
-  background: #f1f5f9;
-  color: #374151;
-  border-color: #d1d5db;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.batch-btn.select-btn.high-confidence {
+  background: rgba(52, 168, 83, 0.1);
+  color: #34a853;
+  border-color: rgba(52, 168, 83, 0.2);
+}
+
+.batch-btn.select-btn.high-confidence:hover:not(:disabled) {
+  background: rgba(52, 168, 83, 0.15);
+  transform: translateY(-1px);
 }
 
 .batch-btn.select-btn:disabled {
-  background: #f9fafb;
-  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.02);
+  color: #555;
+  border-color: rgba(255, 255, 255, 0.04);
   cursor: not-allowed;
+  transform: none;
 }
 
 .batch-btn.quick-approve {
-  background: #8b5cf6;
+  background: linear-gradient(135deg, #4285f4, #1a73e8);
   color: white;
+  border: none;
+  box-shadow: 0 1px 3px rgba(66, 133, 244, 0.3);
 }
 
 .batch-btn.quick-approve:hover {
-  background: #7c3aed;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #1a73e8, #1557b0);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4);
 }
 
 .batch-btn.approve {
-  background: #10b981;
+  background: linear-gradient(135deg, #34a853, #137333);
   color: white;
+  border: none;
+  box-shadow: 0 1px 3px rgba(52, 168, 83, 0.3);
 }
 
 .batch-btn.approve:hover {
-  background: #059669;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #137333, #0d652d);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(52, 168, 83, 0.4);
 }
 
 .batch-btn.reject {
-  background: #ef4444;
+  background: linear-gradient(135deg, #ea4335, #d33b2c);
   color: white;
+  border: none;
+  box-shadow: 0 1px 3px rgba(234, 67, 53, 0.3);
 }
 
 .batch-btn.reject:hover {
-  background: #dc2626;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #d33b2c, #b52d20);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(234, 67, 53, 0.4);
+}
+
+.batch-btn.select-more {
+  background: rgba(255, 255, 255, 0.02);
+  color: #888;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  padding: 3px 6px;
+}
+
+.batch-btn.select-more:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #bbb;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .batch-controls {
+  .batch-operations {
+    padding: 4px 6px;
+  }
+  
+  .batch-content {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
+    gap: 6px;
+  }
+  
+  .select-all-section {
+    order: 0;
+    align-self: flex-start;
+  }
+  
+  .batch-controls {
+    order: 1;
+  }
+  
+  .action-section {
+    order: 2;
+    justify-content: space-between;
+    align-items: center;
   }
   
   .selection-controls,
   .action-controls {
     justify-content: center;
     flex-wrap: wrap;
+    width: 100%;
   }
   
   .batch-btn {
-    min-width: 80px;
+    min-width: 60px;
     justify-content: center;
+    flex: 1;
+    margin: 1px;
+    font-size: 10px;
   }
 }
 
 @media (max-width: 480px) {
   .batch-operations {
-    padding: 12px;
-    margin: 12px -12px 16px -12px;
+    margin: 8px -8px 8px -8px;
     border-radius: 0;
     border-left: none;
     border-right: none;
-  }
-  
-  .batch-info {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-  
-  .selection-controls,
-  .action-controls {
-    width: 100%;
-  }
-  
-  .batch-btn {
-    flex: 1;
-    min-width: auto;
   }
 } 

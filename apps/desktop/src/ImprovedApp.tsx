@@ -72,6 +72,10 @@ const ImprovedApp: React.FC = () => {
   // New state for hybrid duplicate UI
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [actionBarVisible, setActionBarVisible] = useState<boolean>(true);
+  
+  // State for section collapse/expand functionality
+  const [isDuplicatesSectionCollapsed, setIsDuplicatesSectionCollapsed] = useState<boolean>(false);
+  const [isRegularFilesSectionCollapsed, setIsRegularFilesSectionCollapsed] = useState<boolean>(false);
 
   // Stats calculations
   const pendingFiles = files.filter(f => f.status === 'pending');
@@ -189,7 +193,8 @@ const ImprovedApp: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    setSelectedFiles(pendingFiles.map(f => f.id));
+    const currentFiles = filteredFiles;
+    setSelectedFiles(currentFiles.map(f => f.id));
   };
 
   const handleSelectNone = () => {
@@ -197,7 +202,8 @@ const ImprovedApp: React.FC = () => {
   };
 
   const handleSelectHighConfidence = () => {
-    setSelectedFiles(highConfidenceFiles.map(f => f.id));
+    const currentHighConfidenceFiles = filteredFiles.filter(f => f.confidence >= 0.8);
+    setSelectedFiles(currentHighConfidenceFiles.map(f => f.id));
   };
 
   const handleBatchApprove = async () => {
@@ -394,6 +400,8 @@ const ImprovedApp: React.FC = () => {
   // New handlers for duplicate filtering
   const handleFilterModeChange = (mode: FilterMode) => {
     setFilterMode(mode);
+    // Clear selections when changing tabs (Gmail-like behavior)
+    setSelectedFiles([]);
   };
 
   const handleResolveAllDuplicates = async () => {
@@ -525,6 +533,15 @@ const ImprovedApp: React.FC = () => {
     setActionBarVisible(false);
   };
 
+  // Section collapse/expand handlers
+  const handleToggleDuplicatesSection = () => {
+    setIsDuplicatesSectionCollapsed(!isDuplicatesSectionCollapsed);
+  };
+
+  const handleToggleRegularFilesSection = () => {
+    setIsRegularFilesSectionCollapsed(!isRegularFilesSectionCollapsed);
+  };
+
   return (
     <div className="improved-app">
       <Header
@@ -534,8 +551,8 @@ const ImprovedApp: React.FC = () => {
         filterMode={filterMode}
         searchQuery={searchQuery}
         currentFolder={currentFolder}
-        selectedFilesCount={selectedFiles.length}
-        highConfidenceCount={highConfidenceFiles.length}
+        selectedFilesCount={selectedFiles.filter(id => filteredFiles.some(f => f.id === id)).length}
+        highConfidenceCount={filteredFiles.filter(f => f.confidence >= 0.8).length}
         onSettingsClick={() => setSettingsOpen(true)}
         onNotificationClick={() => setShowBatchOperations(!showBatchOperations)}
         onFilterModeChange={handleFilterModeChange}
@@ -651,11 +668,11 @@ const ImprovedApp: React.FC = () => {
           ) : (
             <>
               {/* Batch Operations - Show when files are available */}
-              {(pendingFiles.length > 1 || showBatchOperations) && (
+              {(filteredFiles.length > 0 || showBatchOperations) && (
                 <BatchOperations
-                  selectedFiles={selectedFiles}
-                  totalPendingFiles={pendingFiles.length}
-                  highConfidenceCount={highConfidenceFiles.length}
+                  selectedFiles={selectedFiles.filter(id => filteredFiles.some(f => f.id === id))}
+                  totalPendingFiles={filteredFiles.length}
+                  highConfidenceCount={filteredFiles.filter(f => f.confidence >= 0.8).length}
                   onSelectAll={handleSelectAll}
                   onSelectNone={handleSelectNone}
                   onSelectHighConfidence={handleSelectHighConfidence}
@@ -664,8 +681,6 @@ const ImprovedApp: React.FC = () => {
                   onBatchApproveHighConfidence={handleBatchApproveHighConfidence}
                 />
               )}
-
-
 
               {/* File Review Cards with Hybrid Display */}
               <div className="files-section">
@@ -698,62 +713,76 @@ const ImprovedApp: React.FC = () => {
                         {/* Duplicates Section */}
                         {groupedFiles.duplicates.length > 0 && (
                           <div className="file-group duplicate-group">
-                            <div className="group-header">
-                              <h3 className="group-title">
-                                <span className="group-icon">🔍</span>
-                                Duplicate Files ({groupedFiles.duplicates.length})
-                              </h3>
-                              <p className="group-subtitle">
-                                Files that have similar content or names detected in your system
-                              </p>
+                            <div className="group-header" onClick={handleToggleDuplicatesSection}>
+                              <div className="group-header-content">
+                                <h3 className="group-title">
+                                  <span className="group-icon">🔍</span>
+                                  Duplicate Files ({groupedFiles.duplicates.length})
+                                </h3>
+                               
+                              </div>
+                              <button className="group-toggle-btn">
+                                <span className={`toggle-icon ${isDuplicatesSectionCollapsed ? 'collapsed' : 'expanded'}`}>
+                                  ▼
+                                </span>
+                              </button>
                             </div>
-                            <div className="files-list">
-                              {groupedFiles.duplicates.map(file => (
-                                <FileReviewCard
-                                  key={file.id}
-                                  file={file}
-                                  onApprove={handleApproveFile}
-                                  onReject={handleRejectFile}
-                                  isSelected={selectedFiles.includes(file.id)}
-                                  onSelect={handleFileSelection}
-                                  onKeepBoth={handleKeepBoth}
-                                  onReplaceWithBetter={handleReplaceWithBetter}
-                                  onDeleteDuplicates={handleDeleteDuplicates}
-                                  onPreviewFile={handlePreviewFile}
-                                />
-                              ))}
-                            </div>
+                            {!isDuplicatesSectionCollapsed && (
+                              <div className="files-list">
+                                {groupedFiles.duplicates.map(file => (
+                                  <FileReviewCard
+                                    key={file.id}
+                                    file={file}
+                                    onApprove={handleApproveFile}
+                                    onReject={handleRejectFile}
+                                    isSelected={selectedFiles.includes(file.id)}
+                                    onSelect={handleFileSelection}
+                                    onKeepBoth={handleKeepBoth}
+                                    onReplaceWithBetter={handleReplaceWithBetter}
+                                    onDeleteDuplicates={handleDeleteDuplicates}
+                                    onPreviewFile={handlePreviewFile}
+                                  />
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
 
                         {/* Regular Files Section */}
                         {groupedFiles.regular.length > 0 && (
                           <div className="file-group regular-group">
-                            <div className="group-header">
-                              <h3 className="group-title">
-                                <span className="group-icon">📄</span>
-                                Regular Files ({groupedFiles.regular.length})
-                              </h3>
-                              <p className="group-subtitle">
-                                New files ready for AI-powered organization
-                              </p>
+                            <div className="group-header" onClick={handleToggleRegularFilesSection}>
+                              <div className="group-header-content">
+                                <h3 className="group-title">
+                                  <span className="group-icon">📄</span>
+                                  Regular Files ({groupedFiles.regular.length})
+                                </h3>
+                              
+                              </div>
+                              <button className="group-toggle-btn">
+                                <span className={`toggle-icon ${isRegularFilesSectionCollapsed ? 'collapsed' : 'expanded'}`}>
+                                  ▼
+                                </span>
+                              </button>
                             </div>
-                            <div className="files-list">
-                              {groupedFiles.regular.map(file => (
-                                <FileReviewCard
-                                  key={file.id}
-                                  file={file}
-                                  onApprove={handleApproveFile}
-                                  onReject={handleRejectFile}
-                                  isSelected={selectedFiles.includes(file.id)}
-                                  onSelect={handleFileSelection}
-                                  onKeepBoth={handleKeepBoth}
-                                  onReplaceWithBetter={handleReplaceWithBetter}
-                                  onDeleteDuplicates={handleDeleteDuplicates}
-                                  onPreviewFile={handlePreviewFile}
-                                />
-                              ))}
-                            </div>
+                            {!isRegularFilesSectionCollapsed && (
+                              <div className="files-list">
+                                {groupedFiles.regular.map(file => (
+                                  <FileReviewCard
+                                    key={file.id}
+                                    file={file}
+                                    onApprove={handleApproveFile}
+                                    onReject={handleRejectFile}
+                                    isSelected={selectedFiles.includes(file.id)}
+                                    onSelect={handleFileSelection}
+                                    onKeepBoth={handleKeepBoth}
+                                    onReplaceWithBetter={handleReplaceWithBetter}
+                                    onDeleteDuplicates={handleDeleteDuplicates}
+                                    onPreviewFile={handlePreviewFile}
+                                  />
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </>

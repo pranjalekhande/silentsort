@@ -24,74 +24,97 @@ const BatchOperations: React.FC<BatchOperationsProps> = ({
   onBatchReject,
   onBatchApproveHighConfidence,
 }) => {
+  const hasSelection = selectedFiles.length > 0;
+  const allSelected = selectedFiles.length === totalPendingFiles;
+  const partiallySelected = hasSelection && !allSelected;
+  
+  const handleSelectAllToggle = () => {
+    if (allSelected || partiallySelected) {
+      onSelectNone();
+    } else {
+      onSelectAll();
+    }
+  };
+  
   return (
-    <div className="batch-operations">
-      <div className="batch-header">
-        <div className="batch-info">
-          <span className="selected-count">
-            {selectedFiles.length} of {totalPendingFiles} selected
-          </span>
-          {highConfidenceCount > 0 && (
-            <span className="high-confidence-note">
-              {highConfidenceCount} high confidence
+    <div className={`batch-operations ${hasSelection ? 'has-selection' : ''}`}>
+      <div className="batch-content">
+        <div className="select-all-section">
+          <div className="select-all-checkbox-wrapper">
+            <input
+              type="checkbox"
+              className={`select-all-checkbox ${partiallySelected ? 'partially-selected' : ''}`}
+              checked={allSelected}
+              onChange={handleSelectAllToggle}
+              disabled={totalPendingFiles === 0}
+            />
+            <span className="select-count">
+              {hasSelection ? selectedFiles.length : totalPendingFiles} Files (Select To Batch Process)
             </span>
-          )}
-        </div>
-      </div>
-      
-      <div className="batch-controls">
-        <div className="selection-controls">
-          <button 
-            className="batch-btn select-btn" 
-            onClick={onSelectAll}
-            disabled={selectedFiles.length === totalPendingFiles}
-          >
-            Select All
-          </button>
-          
-          <button 
-            className="batch-btn select-btn" 
-            onClick={onSelectHighConfidence}
-            disabled={highConfidenceCount === 0}
-          >
-            High Confidence ({highConfidenceCount})
-          </button>
-          
-          <button 
-            className="batch-btn select-btn" 
-            onClick={onSelectNone}
-            disabled={selectedFiles.length === 0}
-          >
-            Clear
-          </button>
+          </div>
         </div>
         
-        <div className="action-controls">
-          {highConfidenceCount > 0 && selectedFiles.length === 0 && (
-            <button 
-              className="batch-btn quick-approve" 
-              onClick={onBatchApproveHighConfidence}
-            >
-              ⚡ Quick Approve {highConfidenceCount}
-            </button>
+        <div className="batch-controls">
+          {!hasSelection && (
+            // Default state - selection options
+            <div className="selection-controls">
+              {/* <button 
+                className="batch-btn select-btn" 
+                onClick={onSelectAll}
+                disabled={totalPendingFiles === 0}
+              >
+                Select All
+              </button> */}
+              
+              {highConfidenceCount > 0 && (
+                <>
+                  <button 
+                    className="batch-btn select-btn high-confidence" 
+                    onClick={onSelectHighConfidence}
+                  >
+                    High Confidence ({highConfidenceCount})
+                  </button>
+                  
+                  <button 
+                    className="batch-btn quick-approve" 
+                    onClick={onBatchApproveHighConfidence}
+                  >
+                    Quick Approve {highConfidenceCount}
+                  </button>
+                </>
+              )}
+            </div>
           )}
-          
-          {selectedFiles.length > 0 && (
-            <>
+        </div>
+        
+        <div className="action-section">
+          {hasSelection ? (
+            // Selection state - actions on the right
+            <div className="action-controls">
               <button 
                 className="batch-btn approve" 
                 onClick={onBatchApprove}
               >
-                ✓ Approve {selectedFiles.length}
+                ✓  {selectedFiles.length}
               </button>
               
               <button 
                 className="batch-btn reject" 
                 onClick={onBatchReject}
               >
-                ✕ Reject {selectedFiles.length}
+                ✕  {selectedFiles.length}
               </button>
-            </>
+            </div>
+          ) : null}
+          
+          {hasSelection && (
+            <button 
+              className="clear-selection-btn" 
+              onClick={onSelectNone}
+              title="Clear selection"
+            >
+              ✕
+            </button>
           )}
         </div>
       </div>

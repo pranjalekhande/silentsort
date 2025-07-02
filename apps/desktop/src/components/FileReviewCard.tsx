@@ -197,7 +197,7 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
 
   return (
     <div 
-      className={`file-card ${hasDuplicates ? 'duplicate-card' : 'regular-card'} ${showDetails ? 'expanded' : ''}`} 
+      className={`file-card ${hasDuplicates ? 'duplicate-card' : 'regular-card'} ${showDetails ? 'expanded' : ''} ${isSelected ? 'selected' : ''}`} 
       data-file-id={file.id}
       onClick={handleCardClick}
     >
@@ -223,23 +223,20 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
         )}
         
         <div className="file-content">
-          <div className="file-header">
-            <span className="file-icon">{getFileIcon(file.originalName, file.category)}</span>
-            <div className="file-meta">
-              <span className="category">{file.category}</span>
-              <span className={`confidence confidence-${getConfidenceColor(file.confidence)}`}>
-                {Math.round(file.confidence * 100)}%
-              </span>
-            </div>
-          </div>
-          
           <div className="file-names">
-            <div className="name-row">
+            <span className="file-icon">{getFileIcon(file.originalName, file.category)}</span>
+            <div className="name-row first-row">
               <span className="label">From:</span>
               <span className="original-name">{file.originalName}</span>
+              <div className="file-meta">
+                <span className="category">{file.category}</span>
+                <span className={`confidence confidence-${getConfidenceColor(file.confidence)}`}>
+                  {Math.round(file.confidence * 100)}%
+                </span>
+              </div>
             </div>
-            <div className="name-row main">
-              <span className="label">To:</span>
+            <div className="name-row second-row">
+              <span className="label to-label">To:</span>
               {isEditing ? (
                 <input
                   type="text"
@@ -263,24 +260,26 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
             </div>
           </div>
           
-          {keyEntities.length > 0 && (
-            <div className="key-entities">
-              {keyEntities.map((entity, i) => (
-                <span key={i} className="entity-tag">{entity}</span>
-              ))}
-            </div>
-          )}
-
-          {/* Smart tags in compact view */}
-          {file.smartTags && file.smartTags.length > 0 && !showDetails && (
-            <div className="compact-smart-tags">
-              {file.smartTags.slice(0, 3).map((tag, i) => (
-                <span key={i} className="compact-tag">{tag}</span>
-              ))}
-              {file.smartTags.length > 3 && (
-                <span className="compact-tag more">+{file.smartTags.length - 3}</span>
+          {/* Only show tags and entities in expanded view */}
+          {showDetails && (
+            <>
+              {keyEntities.length > 0 && (
+                <div className="key-entities">
+                  {keyEntities.map((entity, i) => (
+                    <span key={i} className="entity-tag">{entity}</span>
+                  ))}
+                </div>
               )}
-            </div>
+
+              {/* Smart tags in expanded view only */}
+              {file.smartTags && file.smartTags.length > 0 && (
+                <div className="compact-smart-tags">
+                  {file.smartTags.map((tag, i) => (
+                    <span key={i} className="compact-tag">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {/* Duplicate Information */}
