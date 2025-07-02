@@ -8,6 +8,7 @@
     "dev": "npm run compile:electron && concurrently \"npm run dev:react\" \"npm run dev:electron\"",
     "dev:react": "react-scripts start",
     "dev:electron": "wait-on tcp:3000 && electron . --disable-gpu --disable-hardware-acceleration --disable-software-rasterizer",
+    "electron:serve": "npm run dev",
     "compile:electron": "tsc --project tsconfig.electron.json",
     "build": "react-scripts build && npm run compile:electron",
     "dist": "npm run build && electron-builder",

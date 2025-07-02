@@ -6,11 +6,13 @@ import {
   Tray,
   globalShortcut,
   dialog,
+  shell,
 } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as chokidar from 'chokidar';
 import { aiService } from './services/ai-service';
+import { FileStateManager } from './services/file-state-manager';
 
 // Load environment variables
 require('dotenv').config();
@@ -84,11 +86,15 @@ class SilentSortApp {
   private mainWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
   private fileWatcher: chokidar.FSWatcher | null = null;
-  private processingCache: Map<string, { timestamp: number; status: 'processing' | 'completed' | 'failed' }> = new Map();
-  private readonly CACHE_DURATION = 10000; // Increased to 10 seconds
-  private readonly PROCESSING_TIMEOUT = 30000; // 30 seconds timeout for stuck processing
+  private fileStateManager: FileStateManager;
+  private processingFiles: Set<string> = new Set(); // Track currently processing files
 
   constructor() {
+    this.fileStateManager = new FileStateManager({
+      cooldownMinutes: 5,
+      maxProcessingAttempts: 3,
+      contentHashSampleSize: 8192
+    });
     this.setupApp();
   }
 
@@ -201,7 +207,12 @@ class SilentSortApp {
 
     this.fileWatcher.on('add', (filePath: string) => {
       console.log('📁 New file detected:', filePath);
-      this.processFile(filePath);
+      this.processFile(filePath, 'added');
+    });
+
+    this.fileWatcher.on('change', (filePath: string) => {
+      console.log('📝 File changed:', filePath);
+      this.processFile(filePath, 'changed');
     });
 
     this.fileWatcher.on('error', (error: unknown) => {
@@ -209,7 +220,7 @@ class SilentSortApp {
     });
   }
 
-  private async processFile(filePath: string): Promise<void> {
+  private async processFile(filePath: string, eventType: 'added' | 'renamed' | 'moved' | 'changed' = 'added'): Promise<void> {
     try {
       // Skip hidden files and directories
       if (path.basename(filePath).startsWith('.')) {
@@ -224,31 +235,15 @@ class SilentSortApp {
         return;
       }
 
-      // Check if file was recently processed to prevent duplicates
-      const now = Date.now();
-      const cacheEntry = this.processingCache.get(filePath);
+      // Use FileStateManager to check if file should be processed
+      const shouldProcessResult = await this.fileStateManager.shouldProcessFile(filePath, eventType);
       
-      if (cacheEntry) {
-        const timeSinceProcessed = now - cacheEntry.timestamp;
-        
-        // If currently processing, skip
-        if (cacheEntry.status === 'processing' && timeSinceProcessed < this.PROCESSING_TIMEOUT) {
-          console.log('⏳ File is currently being processed:', fileName);
-          return;
-        }
-        
-        // If recently completed, skip
-        if (cacheEntry.status === 'completed' && timeSinceProcessed < this.CACHE_DURATION) {
-          console.log('⏭️ Skipping recently processed file:', fileName, `(${Math.round(timeSinceProcessed/1000)}s ago)`);
-          return;
-        }
-        
-        // If failed recently but not too long ago, skip to avoid spam
-        if (cacheEntry.status === 'failed' && timeSinceProcessed < (this.CACHE_DURATION / 2)) {
-          console.log('⏭️ Skipping recently failed file:', fileName);
-          return;
-        }
+      if (!shouldProcessResult.shouldProcess) {
+        console.log(`⏭️ ${shouldProcessResult.reason}:`, fileName);
+        return;
       }
+
+      console.log(`🎯 Processing file (${eventType}):`, fileName, `- ${shouldProcessResult.reason}`);
 
       // Check if file actually exists and is readable
       const fs = require('fs').promises;
@@ -270,28 +265,85 @@ class SilentSortApp {
         return;
       }
 
-      // Mark file as being processed
-      this.processingCache.set(filePath, { timestamp: now, status: 'processing' });
-      console.log('🤖 Processing file with AI:', fileName);
-
-      // Process file with AI
-      const aiResult = await aiService.analyzeFile(filePath);
-      console.log('✅ AI analysis completed for:', fileName, '- Confidence:', aiResult.confidence);
-
-      // Send file with AI analysis to renderer
-      if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
-        this.mainWindow.webContents.send('new-file-detected', {
-          filePath,
-          aiResult,
-        });
+      // Check if already processing this file
+      if (this.processingFiles.has(filePath)) {
+        console.log('⏳ File is already being processed:', fileName);
+        return;
       }
 
-      // Mark file as completed
-      this.processingCache.set(filePath, { timestamp: now, status: 'completed' });
-      console.log('📋 File processing cache updated:', fileName, 'status: completed');
+      // Register file for processing and mark as processing
+      const fileHash = await this.fileStateManager.registerFileForProcessing(filePath);
+      this.processingFiles.add(filePath);
+      console.log('🤖 Processing file with AI:', fileName);
+
+      try {
+        // Process file with AI
+        const aiResult = await aiService.analyzeFile(filePath);
+        console.log('✅ AI analysis completed for:', fileName, '- Confidence:', aiResult.confidence);
+
+        // Task 2B: Enhanced analysis with duplicate detection and smart tagging
+        console.log('🔍 Performing duplicate detection and smart tagging...');
+        
+        // Update file registry with AI analysis results
+        await this.fileStateManager.updateFileWithAnalysis(filePath, {
+          category: aiResult.category,
+          keywords: aiResult.technical_tags || [],
+          contentSummary: aiResult.contentSummary,
+          extractedEntities: aiResult.extracted_entities
+        });
+
+        // Get comprehensive file analysis including duplicates
+        const comprehensiveAnalysis = await this.fileStateManager.getFileAnalysis(filePath);
+        
+        console.log('🏷️ Enhanced analysis completed:', {
+          file: fileName,
+          duplicates: comprehensiveAnalysis.duplicateAnalysis.isDuplicate,
+          duplicateCount: comprehensiveAnalysis.duplicateAnalysis.duplicateFiles.length,
+          similarCount: comprehensiveAnalysis.duplicateAnalysis.similarFiles.length,
+          tags: comprehensiveAnalysis.smartTags.length,
+          folderSuggested: comprehensiveAnalysis.folderSuggestion.confidence > 0.5
+        });
+
+        // Send enhanced file data to renderer
+        if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
+          this.mainWindow.webContents.send('new-file-detected', {
+            filePath,
+            aiResult: {
+              ...aiResult,
+              // Add duplicate detection info to AI result
+              duplicateInfo: comprehensiveAnalysis.duplicateAnalysis.isDuplicate ? {
+                isDuplicate: true,
+                duplicateFiles: comprehensiveAnalysis.duplicateAnalysis.duplicateFiles,
+                similarFiles: comprehensiveAnalysis.duplicateAnalysis.similarFiles,
+                action: comprehensiveAnalysis.duplicateAnalysis.action,
+                betterVersion: comprehensiveAnalysis.duplicateAnalysis.betterVersion
+              } : undefined,
+              // Add smart tags to AI result
+              smartTags: comprehensiveAnalysis.smartTags.map(tag => tag.tag),
+              // Add folder suggestion to AI result
+              folderSuggestion: comprehensiveAnalysis.folderSuggestion.confidence > 0.5 ? {
+                path: comprehensiveAnalysis.folderSuggestion.suggestedPath,
+                confidence: comprehensiveAnalysis.folderSuggestion.confidence,
+                reasoning: comprehensiveAnalysis.folderSuggestion.reasoning
+              } : undefined
+            },
+            fileHash, // Include hash for tracking
+            comprehensiveAnalysis // Include full analysis for advanced UI features
+          });
+        }
+
+        console.log('📋 Enhanced file processing completed:', fileName);
+        
+      } finally {
+        // Always remove from processing set
+        this.processingFiles.delete(filePath);
+      }
       
     } catch (error) {
       console.error('❌ Error processing file:', path.basename(filePath), error instanceof Error ? error.message : error);
+      
+      // Remove from processing set on error
+      this.processingFiles.delete(filePath);
 
       // Send file with error to renderer
       if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
@@ -306,10 +358,6 @@ class SilentSortApp {
           },
         });
       }
-
-      // Mark file as failed
-      this.processingCache.set(filePath, { timestamp: Date.now(), status: 'failed' });
-      console.log('📋 File processing cache updated:', path.basename(filePath), 'status: failed');
     }
   }
 
@@ -359,6 +407,62 @@ class SilentSortApp {
       return stats;
     });
 
+    // File state management handlers
+    ipcMain.handle('update-user-action', async (event, filePath: string, action: 'accepted' | 'rejected' | 'modified', newPath?: string) => {
+      console.log('📝 User action update:', { filePath, action, newPath });
+      try {
+        await this.fileStateManager.updateUserAction(filePath, action, newPath);
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Failed to update user action:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    });
+
+    ipcMain.handle('get-file-history', async (event, filePath: string) => {
+      const history = this.fileStateManager.getFileHistory(filePath);
+      return history;
+    });
+
+    ipcMain.handle('reset-cooldown', async (event, filePath: string) => {
+      return await this.fileStateManager.resetCooldown(filePath);
+    });
+
+    // New Task 2B: Duplicate Detection & Smart Tagging IPC handlers
+    ipcMain.handle('get-file-analysis', async (event, filePath: string) => {
+      console.log('🔍 Getting comprehensive file analysis:', path.basename(filePath));
+      try {
+        const analysis = await this.fileStateManager.getFileAnalysis(filePath);
+        console.log('✅ File analysis completed:', {
+          file: path.basename(filePath),
+          isDuplicate: analysis.duplicateAnalysis.isDuplicate,
+          tagsCount: analysis.smartTags.length,
+          folderSuggested: analysis.folderSuggestion.confidence > 0.5
+        });
+        return analysis;
+      } catch (error) {
+        console.error('❌ Failed to get file analysis:', error);
+        return {
+          duplicateAnalysis: {
+            isDuplicate: false,
+            similarFiles: [],
+            duplicateFiles: [],
+            confidence: 0.0,
+            action: 'keep_both',
+            reason: 'Analysis failed'
+          },
+          smartTags: [],
+          folderSuggestion: {
+            suggestedPath: path.dirname(filePath),
+            confidence: 0.0,
+            reasoning: 'Analysis failed',
+            basedOn: 'content_analysis',
+            alternatives: []
+          }
+        };
+      }
+    });
+
     // Folder selection handlers
     ipcMain.handle('select-folder', async () => {
       const result = await dialog.showOpenDialog(this.mainWindow!, {
@@ -390,6 +494,36 @@ class SilentSortApp {
       return store.get('isFirstRun');
     });
 
+    // File preview functionality
+    ipcMain.handle('open-file', async (event, filePath: string) => {
+      console.log('🔍 Opening file for preview:', path.basename(filePath));
+      try {
+        // Check if file exists before trying to open it
+        if (!fs.existsSync(filePath)) {
+          console.error('❌ File not found for preview:', filePath);
+          throw new Error('File not found');
+        }
+
+        // Use shell.openPath to open file with system default application
+        const result = await shell.openPath(filePath);
+        
+        if (result) {
+          // If result is non-empty, it means there was an error
+          console.error('❌ Failed to open file:', result);
+          throw new Error(result);
+        }
+        
+        console.log('✅ File opened successfully for preview:', path.basename(filePath));
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Error opening file for preview:', error);
+        return { 
+          success: false, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        };
+      }
+    });
+
     ipcMain.handle(
       'rename-file',
       async (event, oldPath: string, newPath: string) => {
@@ -415,6 +549,9 @@ class SilentSortApp {
           // Perform the rename
           await fs.rename(oldPath, newPath);
           console.log('✅ File renamed successfully:', { oldPath, newPath });
+
+          // Update FileStateManager to mark as accepted
+          await this.fileStateManager.updateUserAction(oldPath, 'accepted', newPath);
 
           return { success: true, message: 'File renamed successfully' };
         } catch (error) {
@@ -460,39 +597,18 @@ class SilentSortApp {
   }
 
   private setupCacheCleanup(): void {
-    // Clean up old entries from processing cache every minute
-    setInterval(() => {
-      const now = Date.now();
-      for (const [filePath, { timestamp, status }] of this.processingCache.entries()) {
-        if (status === 'failed' || (now - timestamp > this.PROCESSING_TIMEOUT)) {
-          this.processingCache.delete(filePath);
-        }
-      }
-    }, 60000); // Clean up every minute
+    // FileStateManager handles its own cleanup automatically
+    console.log('✅ FileStateManager will handle automatic cleanup');
   }
 
   private getCacheStatistics(): { totalFiles: number; processingFiles: number; completedFiles: number; failedFiles: number } {
-    let totalFiles = 0;
-    let processingFiles = 0;
-    let completedFiles = 0;
-    let failedFiles = 0;
-
-    for (const [filePath, { status }] of this.processingCache.entries()) {
-      totalFiles++;
-      if (status === 'processing') {
-        processingFiles++;
-      } else if (status === 'completed') {
-        completedFiles++;
-      } else if (status === 'failed') {
-        failedFiles++;
-      }
-    }
-
+    const stats = this.fileStateManager.getRegistryStats();
+    
     return {
-      totalFiles,
-      processingFiles,
-      completedFiles,
-      failedFiles,
+      totalFiles: stats.totalFiles,
+      processingFiles: this.processingFiles.size,
+      completedFiles: stats.acceptedFiles + stats.rejectedFiles + stats.modifiedFiles,
+      failedFiles: 0, // FileStateManager doesn't track failures the same way
     };
   }
 }

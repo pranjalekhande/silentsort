@@ -1,0 +1,18 @@
+MICROSOFT AZURE
+Invoice #: INV-2024-AZ-001234
+Invoice Date: December 15, 2024
+Due Date: January 15, 2025
+
+Bill To: Pranjal Ekhande
+Service Period: November 1 - November 30, 2024
+
+Azure Virtual Machines: .95
+Azure SQL Database: .01
+Azure Storage: .05
+Azure Functions: /bin/zsh.30
+
+Subtotal: .31
+Tax: .09
+Total Amount Due: .40
+
+Payment Status: PENDING

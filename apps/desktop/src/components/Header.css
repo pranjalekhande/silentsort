@@ -1,230 +1,515 @@
-/* Compact Professional Header */
-.app-header {
+/* Mac-style Header Component - Dark Theme */
+
+.mac-header {
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid #e5e7eb;
-  color: #1f2937;
+  flex-direction: column;
   position: sticky;
   top: 0;
   z-index: 100;
-  min-height: 60px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Logo Section - Compact */
-.header-left {
-  flex: 1;
-  min-width: 160px;
-}
+/* ============================================
+   TITLE BAR - Mac Chrome Style (44px)
+   ============================================ */
 
-.logo-section {
+.title-bar {
+  height: 44px;
+  background: #2d2d2d;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #444;
+  -webkit-app-region: drag; /* Make title bar draggable */
+}
+
+.title-bar-left {
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+}
+
+.mac-controls {
+  display: flex;
   gap: 8px;
+  -webkit-app-region: no-drag; /* Prevent dragging on buttons */
 }
 
-.logo-icon {
-  font-size: 24px;
-  color: #3b82f6;
-}
-
-.logo-text h1 {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0;
-  color: #1f2937;
-}
-
-.tagline {
-  font-size: 10px;
-  color: #6b7280;
-  font-weight: 500;
-  display: block;
-  margin-top: -1px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Stats Section - Inline and Compact */
-.header-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-}
-
-.stats-compact {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 16px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  font-size: 14px;
-}
-
-.stat-item {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.stat-number {
-  font-weight: 700;
-  color: #1f2937;
-  font-size: 16px;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.stat-item.urgent .stat-number {
-  color: #dc2626;
-}
-
-.stat-item.urgent .stat-label {
-  color: #dc2626;
-}
-
-.stat-divider {
-  color: #d1d5db;
-  font-weight: 700;
-}
-
-/* Actions Section - Compact */
-.header-right {
-  flex: 1;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.action-group {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.header-btn {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
+.mac-button {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 13px;
-  font-weight: 600;
-  min-height: 36px;
+  background: #666;
+  border: none;
 }
 
-.header-btn:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
+.mac-button.close {
+  background: #666;
 }
 
-.header-btn.secondary {
-  background: #f3f4f6;
-  color: #6b7280;
-  padding: 8px;
-  min-width: 36px;
+.mac-button.minimize {
+  background: #666;
+}
+
+.mac-button.maximize {
+  background: #666;
+}
+
+.mac-button:hover {
+  background: #888;
+  transform: scale(1.1);
+}
+
+.title-bar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.app-title {
+  display: flex;
+  align-items: center;
   justify-content: center;
 }
 
-.header-btn.secondary:hover {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.btn-icon {
-  font-size: 14px;
-}
-
-.btn-label {
-  font-size: 12px;
+.app-name {
+  font-size: 16px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: 0.3px;
 }
 
-.notification-dot {
+.title-bar-right {
+  display: flex;
+  gap: 6px;
+  min-width: 120px;
+  justify-content: flex-end;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.title-bar-btn svg {
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.title-bar-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.title-bar-btn:hover svg {
+  opacity: 1;
+}
+
+.title-bar-btn:active {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(0.95);
+}
+
+.settings-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.notifications-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.notification-badge {
   position: absolute;
   top: -2px;
   right: -2px;
-  background: #dc2626;
+  background: #ff5f57;
   color: white;
-  border-radius: 10px;
-  width: 18px;
-  height: 18px;
-  font-size: 10px;
+  border-radius: 8px;
+  padding: 1px 4px;
+  font-size: 8px;
   font-weight: 700;
+  min-width: 14px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-  border: 2px solid white;
+  border: 1px solid #2d2d2d;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-/* Responsive Design */
+/* ============================================
+   SEARCH/TAB BAR - Chrome Inspired (60px)
+   ============================================ */
+
+.search-tab-bar {
+  height: 60px;
+  background: #1e1e1e;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  gap: 16px;
+  border-bottom: 1px solid #333;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 0;
+  background: #2a2a2a;
+  border-radius: 8px;
+  padding: 4px;
+  border: 1px solid #444;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.tab-btn.active {
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+/* Removed red styling for duplicates tab - keeping same format as other tabs */
+
+.tab-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tab-count {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.search-container {
+  flex: 1;
+  max-width: 600px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 20px;
+  padding: 0 16px;
+  transition: all 0.2s ease;
+}
+
+.search-input-wrapper:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-icon {
+  color: #777;
+  margin-right: 10px;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 0;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: #666;
+}
+
+.search-input:focus + .search-icon,
+.search-input-wrapper:focus-within .search-icon {
+  color: #aaa;
+  opacity: 1;
+}
+
+.clear-search {
+  background: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-search:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.clear-search svg {
+  opacity: 0.8;
+}
+
+.clear-search:hover svg {
+  opacity: 1;
+}
+
+/* ============================================
+   ACTION BAR - Minimal Stats & Actions (40px)
+   ============================================ */
+
+.action-bar {
+  height: 40px;
+  background: #252525;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #333;
+}
+
+.stats-summary {
+  display: flex;
+  align-items: center;
+}
+
+.stats-text {
+  font-size: 13px;
+  color: #ccc;
+  font-weight: 500;
+}
+
+.stats-divider {
+  margin: 0 8px;
+  color: #666;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.action-btn {
+  position: relative;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #444;
+  color: #aaa;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn svg {
+  opacity: 0.8;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #666;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.action-btn:hover svg {
+  opacity: 1;
+}
+
+.action-btn.batch {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #3b82f6;
+}
+
+.action-btn.batch:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+}
+
+.action-btn.duplicates {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ff6b6b;
+}
+
+.action-btn.duplicates:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ff6b6b;
+}
+
+.action-btn.dismiss {
+  background: transparent;
+  border: none;
+  color: #777;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  margin-left: 4px;
+  border-radius: 6px;
+}
+
+.action-btn.dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transform: none;
+}
+
+.action-btn.dismiss svg {
+  width: 12px;
+  height: 12px;
+}
+
+.action-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #ff5f57;
+  color: white;
+  border-radius: 6px;
+  padding: 1px 3px;
+  font-size: 7px;
+  font-weight: 600;
+  min-width: 10px;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 1px solid #252525;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
 @media (max-width: 768px) {
-  .app-header {
-    padding: 10px 16px;
-    min-height: 56px;
+  .title-bar {
+    padding: 0 12px;
   }
   
-  .logo-text h1 {
-    font-size: 16px;
+  .search-tab-bar {
+    flex-direction: column;
+    height: auto;
+    padding: 12px;
+    gap: 12px;
   }
   
-  .tagline {
-    display: none;
+  .tab-buttons {
+    align-self: stretch;
+    justify-content: space-between;
   }
   
-  .stats-compact {
-    gap: 8px;
-    padding: 4px 12px;
+  .tab-btn {
+    flex: 1;
+    text-align: center;
+    padding: 6px 8px;
+    font-size: 12px;
   }
   
-  .stat-number {
-    font-size: 14px;
+  .search-container {
+    max-width: none;
+    align-self: stretch;
   }
   
-  .btn-label {
-    display: none;
+  .action-bar {
+    padding: 0 12px;
   }
   
-  .header-btn {
-    padding: 8px;
-    min-width: 36px;
-    justify-content: center;
+  .stats-text {
+    font-size: 12px;
+  }
+  
+  .action-btn {
+    min-width: 28px;
+    height: 28px;
+    font-size: 12px;
   }
 }
 
 @media (max-width: 480px) {
-  .header-center {
-    display: none;
+  .app-name {
+    font-size: 14px;
+    letter-spacing: 0.2px;
   }
   
-  .header-left,
-  .header-right {
-    flex: auto;
+  .tab-btn {
+    padding: 4px 6px;
+    font-size: 11px;
   }
   
-  .logo-section {
-    gap: 6px;
+  .tab-count {
+    font-size: 10px;
   }
   
-  .logo-icon {
-    font-size: 20px;
+  .search-input {
+    font-size: 13px;
+  }
+  
+  .stats-text {
+    font-size: 11px;
+  }
+  
+  .action-btn {
+    min-width: 24px;
+    height: 24px;
+    font-size: 11px;
+    padding: 4px;
+  }
+  
+  .action-badge {
+    font-size: 7px;
+    min-width: 10px;
+    height: 10px;
   }
 } 

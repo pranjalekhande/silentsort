@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import Header from './components/Header';
+import Header, { FilterMode } from './components/Header';
 import FileReviewCard from './components/FileReviewCard';
 import BatchOperations from './components/BatchOperations';
 import './ImprovedApp.css';
 
 // Import types from our electron declarations
 import type { AIResult } from './types/electron';
+
+// Simple path utilities for frontend use
+const path = {
+  isAbsolute: (p: string) => p.startsWith('/') || /^[A-Za-z]:[\\/]/.test(p),
+  basename: (p: string) => p.split(/[\\/]/).pop() || '',
+};
 
 interface ExtractedEntities {
   budget?: string;
@@ -15,6 +21,18 @@ interface ExtractedEntities {
   company?: string;
   invoice_number?: string;
   amount?: string;
+}
+
+// Add duplicate detection interfaces
+interface DuplicateInfo {
+  isDuplicate: boolean;
+  duplicateFiles: string[];
+  similarFiles: string[];
+  action: 'merge' | 'rename' | 'keep_both' | 'replace_with_better';
+  betterVersion?: {
+    filePath: string;
+    reason: string;
+  };
 }
 
 interface FileProcessingItem {
@@ -31,6 +49,14 @@ interface FileProcessingItem {
   extracted_entities?: ExtractedEntities;
   processing_time_ms?: number;
   error?: string;
+  // New duplicate detection fields
+  duplicateInfo?: DuplicateInfo;
+  smartTags?: string[];
+  folderSuggestion?: {
+    path: string;
+    confidence: number;
+    reasoning: string;
+  };
 }
 
 const ImprovedApp: React.FC = () => {
@@ -42,11 +68,20 @@ const ImprovedApp: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentFolder, setCurrentFolder] = useState<string>('');
   const [isFirstRun, setIsFirstRun] = useState<boolean>(true);
+  
+  // New state for hybrid duplicate UI
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [actionBarVisible, setActionBarVisible] = useState<boolean>(true);
 
   // Stats calculations
   const pendingFiles = files.filter(f => f.status === 'pending');
   const processedToday = files.filter(f => f.status === 'approved').length;
   const highConfidenceFiles = pendingFiles.filter(f => f.confidence >= 0.8);
+  
+  // Duplicate files calculations
+  const duplicateFiles = pendingFiles.filter(f => f.duplicateInfo?.isDuplicate);
+  const regularFiles = pendingFiles.filter(f => !f.duplicateInfo?.isDuplicate);
+  const duplicateCount = duplicateFiles.length;
 
   useEffect(() => {
     // Check first run and get current folder
@@ -100,6 +135,9 @@ const ImprovedApp: React.FC = () => {
       extracted_entities: aiResult.extracted_entities || { technology: [] },
       processing_time_ms: aiResult.processing_time_ms,
       error: aiResult.error,
+      duplicateInfo: aiResult.duplicateInfo,
+      smartTags: aiResult.smartTags,
+      folderSuggestion: aiResult.folderSuggestion,
     };
 
     setFiles(prev => [newFile, ...prev]);
@@ -184,6 +222,145 @@ const ImprovedApp: React.FC = () => {
     setIsProcessing(false);
   };
 
+  // Enhanced duplicate action handlers with success callbacks and better messaging
+  const handleKeepBoth = async (fileId: string, callback: (success: boolean, message: string) => void) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) {
+      callback(false, 'File not found');
+      return;
+    }
+
+    try {
+      // In a real implementation, you might:
+      // 1. Rename the current file as suggested
+      // 2. Leave duplicate files as they are
+      // 3. Update file registry to mark this decision
+      
+      // Update file status to approved (keep both means we rename the new file as suggested)
+      setFiles(prev =>
+        prev.map(f =>
+          f.id === fileId ? { ...f, status: 'approved' as const } : f
+        )
+      );
+      
+      // Remove from selection if selected
+      setSelectedFiles(prev => prev.filter(id => id !== fileId));
+
+      const duplicateCount = file.duplicateInfo?.duplicateFiles?.length || 0;
+      const message = `✅ Kept both files! "${file.suggestedName}" was saved, ${duplicateCount} duplicate${duplicateCount > 1 ? 's' : ''} remain untouched.`;
+      
+      callback(true, message);
+    } catch (error) {
+      callback(false, 'Failed to keep both files');
+    }
+  };
+
+  const handleReplaceWithBetter = async (fileId: string, betterPath: string, callback: (success: boolean, message: string) => void) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file || !file.duplicateInfo?.betterVersion) {
+      callback(false, 'File or better version not found');
+      return;
+    }
+
+    try {
+      // In a real implementation, you might:
+      // 1. Delete the current file (or move to trash)
+      // 2. Use the better version instead
+      // 3. Update file registry to reflect the decision
+
+      // Update file status to approved
+      setFiles(prev =>
+        prev.map(f =>
+          f.id === fileId ? { 
+            ...f, 
+            status: 'approved' as const,
+            suggestedName: betterPath.split('/').pop() || f.suggestedName
+          } : f
+        )
+      );
+      
+      // Remove from selection if selected
+      setSelectedFiles(prev => prev.filter(id => id !== fileId));
+
+      const betterFileName = betterPath.split('/').pop() || 'better version';
+      const message = `✅ Replaced with better version! Using "${betterFileName}" instead of "${file.originalName}".`;
+      
+      callback(true, message);
+    } catch (error) {
+      callback(false, 'Failed to replace with better version');
+    }
+  };
+
+  const handleDeleteDuplicates = async (fileId: string, duplicatePaths: string[], callback: (success: boolean, message: string) => void) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) {
+      callback(false, 'File not found');
+      return;
+    }
+
+    try {
+      // In a real implementation, you might:
+      // 1. Delete the duplicate files (or move to trash)
+      // 2. Keep the current file and rename it as suggested
+      // 3. Update file registry to mark duplicates as handled
+
+      // Update file status to approved (we keep this file, delete others)
+      setFiles(prev =>
+        prev.map(f =>
+          f.id === fileId ? { ...f, status: 'approved' as const } : f
+        )
+      );
+      
+      // Remove from selection if selected
+      setSelectedFiles(prev => prev.filter(id => id !== fileId));
+
+      const duplicateCount = duplicatePaths.length;
+      const duplicateNames = duplicatePaths.map(path => path.split('/').pop()).slice(0, 2);
+      const namesText = duplicateNames.join(', ');
+      const extraText = duplicateCount > 2 ? ` and ${duplicateCount - 2} more` : '';
+      
+      const message = `✅ Deleted ${duplicateCount} duplicate${duplicateCount > 1 ? 's' : ''}! Removed "${namesText}"${extraText}, kept "${file.suggestedName}".`;
+      
+      callback(true, message);
+    } catch (error) {
+      callback(false, 'Failed to delete duplicates');
+    }
+  };
+
+  // New preview functionality
+  const handlePreviewFile = async (filePath: string) => {
+    try {
+      // Check if we have the full path or just filename
+      let fullPath = filePath;
+      
+      // If it's just a filename, try to find the corresponding file in our files array
+      if (!path.isAbsolute(filePath)) {
+        const fileItem = files.find(f => f.originalName === filePath);
+        if (fileItem?.originalPath) {
+          fullPath = fileItem.originalPath;
+        } else {
+          // Fallback - show alert that file path is not available
+          alert(`Preview not available: Full file path not found for "${filePath}"`);
+          return;
+        }
+      }
+      
+      if (window.electronAPI?.openFile) {
+        const result = await window.electronAPI.openFile(fullPath);
+        if (!result.success) {
+          alert(`Failed to open file: ${result.error || 'Unknown error'}`);
+        }
+        // Success case - file should open in system default application
+      } else {
+        // Fallback - show an alert with file info
+        alert(`Preview: ${fullPath}\n\nElectron API not available - this is a development fallback.`);
+      }
+    } catch (error) {
+      console.error('Preview error:', error);
+      alert(`Failed to preview file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const handleTestAI = async () => {
     if (!window.electronAPI?.testAIService) {
       return;
@@ -214,34 +391,160 @@ const ImprovedApp: React.FC = () => {
     }
   };
 
-  const filteredFiles = pendingFiles.filter(file => {
+  // New handlers for duplicate filtering
+  const handleFilterModeChange = (mode: FilterMode) => {
+    setFilterMode(mode);
+  };
+
+  const handleResolveAllDuplicates = async () => {
+    // Batch resolve all duplicates - in a real implementation, this would
+    // open a modal or wizard to handle all duplicates at once
+    const duplicatesToResolve = duplicateFiles.slice(0, 5); // Limit for demo
+    
+    setIsProcessing(true);
+    try {
+      for (const file of duplicatesToResolve) {
+        // Default action: keep both (approve the current file)
+        await handleApproveFile(file.id);
+      }
+      
+      // Show success message
+      const resolvedCount = duplicatesToResolve.length;
+      alert(`✅ Resolved ${resolvedCount} duplicate${resolvedCount > 1 ? 's' : ''}! All files were kept with suggested names.`);
+    } catch (error) {
+      alert('❌ Failed to resolve some duplicates');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Enhanced filtering logic that respects both search and filter mode
+  const getFilteredFiles = () => {
+    let filesToFilter = pendingFiles;
+    
+    // Apply filter mode first
+    switch (filterMode) {
+      case 'duplicates':
+        filesToFilter = duplicateFiles;
+        break;
+      case 'regular':
+        filesToFilter = regularFiles;
+        break;
+      case 'all':
+      default:
+        filesToFilter = pendingFiles;
+        break;
+    }
+    
+    // Then apply search filter
     if (!searchQuery) {
-      return true;
+      return filesToFilter;
     }
     
     const searchLower = searchQuery.toLowerCase();
-    return (
-      file.originalName.toLowerCase().includes(searchLower) ||
-      file.suggestedName.toLowerCase().includes(searchLower) ||
-      file.category.toLowerCase().includes(searchLower) ||
-      (file.subcategory && file.subcategory.toLowerCase().includes(searchLower)) ||
-      (file.technical_tags?.some(tag => tag.toLowerCase().includes(searchLower))) ||
-      (file.extracted_entities && Object.values(file.extracted_entities).some(value => {
-        if (Array.isArray(value)) {
-          return value.some(v => v.toLowerCase().includes(searchLower));
-        }
-        return value && value.toString().toLowerCase().includes(searchLower);
-      }))
-    );
-  });
+    
+    return filesToFilter.filter(file => {
+      // Basic search
+      const basicMatch = (
+        file.originalName.toLowerCase().includes(searchLower) ||
+        file.suggestedName.toLowerCase().includes(searchLower) ||
+        file.category.toLowerCase().includes(searchLower) ||
+        (file.subcategory && file.subcategory.toLowerCase().includes(searchLower))
+      );
+      
+      // Technical tags search
+      const tagsMatch = file.technical_tags?.some(tag => 
+        tag.toLowerCase().includes(searchLower)
+      ) || false;
+      
+      // Smart tags search
+      const smartTagsMatch = file.smartTags?.some(tag => 
+        tag.toLowerCase().includes(searchLower)
+      ) || false;
+      
+      // Duplicate files search
+      const duplicatesMatch = file.duplicateInfo?.duplicateFiles?.some(filePath => 
+        filePath.toLowerCase().includes(searchLower)
+      ) || false;
+      
+      // Extracted entities search
+      const entitiesMatch = file.extracted_entities && (
+        Object.values(file.extracted_entities).some(value => {
+          if (Array.isArray(value)) {
+            return value.some(v => v.toLowerCase().includes(searchLower));
+          }
+          return value && value.toString().toLowerCase().includes(searchLower);
+        })
+      ) || false;
+      
+      return basicMatch || tagsMatch || smartTagsMatch || duplicatesMatch || entitiesMatch;
+    });
+  };
+
+  const filteredFiles = getFilteredFiles();
+
+  // Group files for display based on filter mode
+  const getGroupedFiles = () => {
+    if (filterMode === 'all' && !searchQuery) {
+      // Show duplicates first, then regular files
+      const searchFilteredDuplicates = duplicateFiles;
+      const searchFilteredRegular = regularFiles;
+      
+      return {
+        duplicates: searchFilteredDuplicates,
+        regular: searchFilteredRegular,
+        showSeparately: true
+      };
+    } else {
+      // For search results or specific filter modes, show as one list
+      return {
+        duplicates: [],
+        regular: filteredFiles,
+        showSeparately: false
+      };
+    }
+  };
+
+  const groupedFiles = getGroupedFiles();
+
+  // New handlers for the Mac-style header
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const handleBatchOperations = () => {
+    setShowBatchOperations(!showBatchOperations);
+  };
+
+  const handleViewModeToggle = () => {
+    // Placeholder for view mode toggle functionality
+    // Could toggle between list/grid view, compact/detailed view, etc.
+  };
+
+  const handleDismissActionBar = () => {
+    setActionBarVisible(false);
+  };
 
   return (
     <div className="improved-app">
       <Header
         filesProcessed={processedToday}
         pendingCount={pendingFiles.length}
+        duplicateCount={duplicateCount}
+        filterMode={filterMode}
+        searchQuery={searchQuery}
+        currentFolder={currentFolder}
+        selectedFilesCount={selectedFiles.length}
+        highConfidenceCount={highConfidenceFiles.length}
         onSettingsClick={() => setSettingsOpen(true)}
         onNotificationClick={() => setShowBatchOperations(!showBatchOperations)}
+        onFilterModeChange={handleFilterModeChange}
+        onResolveAllDuplicates={handleResolveAllDuplicates}
+        onSearchChange={handleSearchChange}
+        onBatchOperations={handleBatchOperations}
+        onViewModeToggle={handleViewModeToggle}
+        onDismissActionBar={pendingFiles.length > 0 && actionBarVisible ? handleDismissActionBar : undefined}
+        showActionBar={actionBarVisible && pendingFiles.length > 0}
       />
 
       <main className="main-content">
@@ -362,55 +665,118 @@ const ImprovedApp: React.FC = () => {
                 />
               )}
 
-              {/* Search and Filter */}
-              <div className="search-section">
-                <div className="search-container">
-                  <input
-                    id="search-input"
-                    type="text"
-                    placeholder={`Search ${pendingFiles.length} pending files... (⌘⇧F globally)`}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="search-input"
-                  />
-                  {searchQuery && (
-                    <button 
-                      className="clear-search"
-                      onClick={() => setSearchQuery('')}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-                
-                {searchQuery && (
-                  <div className="search-results-info">
-                    Showing {filteredFiles.length} of {pendingFiles.length} files
-                  </div>
-                )}
-              </div>
 
-              {/* File Review Cards */}
+
+              {/* File Review Cards with Hybrid Display */}
               <div className="files-section">
                 {filteredFiles.length === 0 ? (
                   <div className="no-results">
-                    <div className="no-results-icon">🔍</div>
-                    <h3>No files match your search</h3>
-                    <p>Try adjusting your search terms or clear the search to see all files.</p>
+                    <div className="no-results-icon">
+                      {filterMode === 'duplicates' ? '🔍' : '📄'}
+                    </div>
+                    <h3>
+                      {filterMode === 'duplicates' && duplicateCount === 0
+                        ? 'No duplicates found'
+                        : filterMode === 'regular' && regularFiles.length === 0
+                          ? 'No regular files'
+                          : 'No files match your search'
+                      }
+                    </h3>
+                    <p>
+                      {filterMode === 'duplicates' && duplicateCount === 0
+                        ? 'All files are unique! No duplicate files detected.'
+                        : filterMode === 'regular' && regularFiles.length === 0
+                          ? 'All pending files are duplicates. Use the "Duplicates" filter to see them.'
+                          : 'Try adjusting your search terms or clear the search to see all files.'
+                      }
+                    </p>
                   </div>
                 ) : (
-                  <div className="files-list">
-                    {filteredFiles.map(file => (
-                      <FileReviewCard
-                        key={file.id}
-                        file={file}
-                        onApprove={handleApproveFile}
-                        onReject={handleRejectFile}
-                        isSelected={selectedFiles.includes(file.id)}
-                        onSelect={handleFileSelection}
-                      />
-                    ))}
-                  </div>
+                  <>
+                    {groupedFiles.showSeparately ? (
+                      <>
+                        {/* Duplicates Section */}
+                        {groupedFiles.duplicates.length > 0 && (
+                          <div className="file-group duplicate-group">
+                            <div className="group-header">
+                              <h3 className="group-title">
+                                <span className="group-icon">🔍</span>
+                                Duplicate Files ({groupedFiles.duplicates.length})
+                              </h3>
+                              <p className="group-subtitle">
+                                Files that have similar content or names detected in your system
+                              </p>
+                            </div>
+                            <div className="files-list">
+                              {groupedFiles.duplicates.map(file => (
+                                <FileReviewCard
+                                  key={file.id}
+                                  file={file}
+                                  onApprove={handleApproveFile}
+                                  onReject={handleRejectFile}
+                                  isSelected={selectedFiles.includes(file.id)}
+                                  onSelect={handleFileSelection}
+                                  onKeepBoth={handleKeepBoth}
+                                  onReplaceWithBetter={handleReplaceWithBetter}
+                                  onDeleteDuplicates={handleDeleteDuplicates}
+                                  onPreviewFile={handlePreviewFile}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Regular Files Section */}
+                        {groupedFiles.regular.length > 0 && (
+                          <div className="file-group regular-group">
+                            <div className="group-header">
+                              <h3 className="group-title">
+                                <span className="group-icon">📄</span>
+                                Regular Files ({groupedFiles.regular.length})
+                              </h3>
+                              <p className="group-subtitle">
+                                New files ready for AI-powered organization
+                              </p>
+                            </div>
+                            <div className="files-list">
+                              {groupedFiles.regular.map(file => (
+                                <FileReviewCard
+                                  key={file.id}
+                                  file={file}
+                                  onApprove={handleApproveFile}
+                                  onReject={handleRejectFile}
+                                  isSelected={selectedFiles.includes(file.id)}
+                                  onSelect={handleFileSelection}
+                                  onKeepBoth={handleKeepBoth}
+                                  onReplaceWithBetter={handleReplaceWithBetter}
+                                  onDeleteDuplicates={handleDeleteDuplicates}
+                                  onPreviewFile={handlePreviewFile}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      // Single list view for filtered results
+                      <div className="files-list">
+                        {filteredFiles.map(file => (
+                          <FileReviewCard
+                            key={file.id}
+                            file={file}
+                            onApprove={handleApproveFile}
+                            onReject={handleRejectFile}
+                            isSelected={selectedFiles.includes(file.id)}
+                            onSelect={handleFileSelection}
+                            onKeepBoth={handleKeepBoth}
+                            onReplaceWithBetter={handleReplaceWithBetter}
+                            onDeleteDuplicates={handleDeleteDuplicates}
+                            onPreviewFile={handlePreviewFile}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </>

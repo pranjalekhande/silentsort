@@ -12,6 +12,18 @@ interface ExtractedEntities {
   amount?: string;
 }
 
+// Add duplicate detection interfaces
+interface DuplicateInfo {
+  isDuplicate: boolean;
+  duplicateFiles: string[];
+  similarFiles: string[];
+  action: 'merge' | 'rename' | 'keep_both' | 'replace_with_better';
+  betterVersion?: {
+    filePath: string;
+    reason: string;
+  };
+}
+
 interface FileProcessingItem {
   id: string;
   originalPath: string;
@@ -26,6 +38,14 @@ interface FileProcessingItem {
   extracted_entities?: ExtractedEntities;
   processing_time_ms?: number;
   error?: string;
+  // New duplicate detection fields
+  duplicateInfo?: DuplicateInfo;
+  smartTags?: string[];
+  folderSuggestion?: {
+    path: string;
+    confidence: number;
+    reasoning: string;
+  };
 }
 
 const App: React.FC = () => {
@@ -168,6 +188,9 @@ const App: React.FC = () => {
       extracted_entities: aiResult.extracted_entities || { technology: [] },
       processing_time_ms: aiResult.processing_time_ms,
       error: aiResult.error,
+      duplicateInfo: aiResult.duplicateInfo,
+      smartTags: aiResult.smartTags,
+      folderSuggestion: aiResult.folderSuggestion,
     };
 
     setFiles(prev => [newFile, ...prev]);
@@ -188,6 +211,9 @@ const App: React.FC = () => {
       category: 'unknown',
       reasoning: 'Processing file...',
       status: 'processing',
+      duplicateInfo: undefined,
+      smartTags: [],
+      folderSuggestion: undefined,
     };
 
     setFiles(prev => [newFile, ...prev]);
@@ -214,6 +240,9 @@ const App: React.FC = () => {
                 processing_time_ms: enhancedResult.processing_time_ms,
                 error: enhancedResult.error,
                 status: enhancedResult.error ? 'rejected' : 'pending',
+                duplicateInfo: enhancedResult.duplicateInfo,
+                smartTags: enhancedResult.smartTags,
+                folderSuggestion: enhancedResult.folderSuggestion,
               }
             : file
         )
@@ -230,6 +259,9 @@ const App: React.FC = () => {
                 category: 'error',
                 reasoning: 'Failed to process file',
                 status: 'rejected',
+                duplicateInfo: undefined,
+                smartTags: [],
+                folderSuggestion: undefined,
               }
             : file
         )
@@ -282,6 +314,75 @@ const App: React.FC = () => {
     );
   };
 
+  // New duplicate action handlers
+  const handleKeepBoth = async (fileId: string) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) return;
+
+    console.log('📁 Keep Both action for file:', file.originalName);
+    
+    // Update file status to approved (keep both means we rename the new file as suggested)
+    setFiles(prev =>
+      prev.map(f =>
+        f.id === fileId ? { ...f, status: 'approved' as const } : f
+      )
+    );
+
+    // In a real implementation, you might:
+    // 1. Rename the current file as suggested
+    // 2. Leave duplicate files as they are
+    // 3. Update file registry to mark this decision
+  };
+
+  const handleReplaceWithBetter = async (fileId: string, betterPath: string) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file || !file.duplicateInfo?.betterVersion) return;
+
+    console.log('🔄 Replace with Better action:', {
+      currentFile: file.originalName,
+      betterFile: betterPath,
+      reason: file.duplicateInfo.betterVersion.reason
+    });
+
+    // Update file status to approved
+    setFiles(prev =>
+      prev.map(f =>
+        f.id === fileId ? { 
+          ...f, 
+          status: 'approved' as const,
+          suggestedName: betterPath.split('/').pop() || f.suggestedName
+        } : f
+      )
+    );
+
+    // In a real implementation, you might:
+    // 1. Delete the current file (or move to trash)
+    // 2. Use the better version instead
+    // 3. Update file registry to reflect the decision
+  };
+
+  const handleDeleteDuplicates = async (fileId: string, duplicatePaths: string[]) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) return;
+
+    console.log('🗑️ Delete Duplicates action:', {
+      keepFile: file.originalName,
+      deleteFiles: duplicatePaths
+    });
+
+    // Update file status to approved (we keep this file, delete others)
+    setFiles(prev =>
+      prev.map(f =>
+        f.id === fileId ? { ...f, status: 'approved' as const } : f
+      )
+    );
+
+    // In a real implementation, you might:
+    // 1. Delete the duplicate files (or move to trash)
+    // 2. Keep the current file and rename it as suggested
+    // 3. Update file registry to mark duplicates as handled
+  };
+
   const filteredFiles = files.filter(file => {
     const searchLower = searchQuery.toLowerCase();
     
@@ -297,6 +398,16 @@ const App: React.FC = () => {
       tag.toLowerCase().includes(searchLower)
     ) || false;
     
+    // Smart tags search
+    const smartTagsMatch = file.smartTags?.some(tag => 
+      tag.toLowerCase().includes(searchLower)
+    ) || false;
+    
+    // Duplicate files search
+    const duplicatesMatch = file.duplicateInfo?.duplicateFiles?.some(filePath => 
+      filePath.toLowerCase().includes(searchLower)
+    ) || false;
+    
     // Extracted entities search
     const entitiesMatch = file.extracted_entities && (
       (file.extracted_entities.budget && file.extracted_entities.budget.toLowerCase().includes(searchLower)) ||
@@ -309,7 +420,7 @@ const App: React.FC = () => {
       ))
     ) || false;
     
-    return basicMatch || tagsMatch || entitiesMatch;
+    return basicMatch || tagsMatch || smartTagsMatch || duplicatesMatch || entitiesMatch;
   });
 
   return (
@@ -409,6 +520,9 @@ const App: React.FC = () => {
                   file={file}
                   onApprove={handleApproveRename}
                   onReject={handleRejectRename}
+                  onKeepBoth={handleKeepBoth}
+                  onReplaceWithBetter={handleReplaceWithBetter}
+                  onDeleteDuplicates={handleDeleteDuplicates}
                 />
               );
             } else {

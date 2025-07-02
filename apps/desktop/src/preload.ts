@@ -18,15 +18,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Cache statistics
   getCacheStats: () => ipcRenderer.invoke('get-cache-stats'),
 
+  // File state management
+  updateUserAction: (filePath: string, action: 'accepted' | 'rejected' | 'modified', newPath?: string) =>
+    ipcRenderer.invoke('update-user-action', filePath, action, newPath),
+  getFileHistory: (filePath: string) =>
+    ipcRenderer.invoke('get-file-history', filePath),
+  resetCooldown: (filePath: string) =>
+    ipcRenderer.invoke('reset-cooldown', filePath),
+
   // Folder selection
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   getCurrentFolder: () => ipcRenderer.invoke('get-current-folder'),
   isFirstRun: () => ipcRenderer.invoke('is-first-run'),
 
+  // Task 2B: Duplicate Detection & Smart Tagging
+  getFileAnalysis: (filePath: string) =>
+    ipcRenderer.invoke('get-file-analysis', filePath),
+
   // Event listeners
-  onNewFileDetected: (
-    callback: (data: { filePath: string; aiResult: AIResult }) => void
-  ) => {
+  onNewFileDetected: (callback: (data: any) => void) => {
     console.log('🔍 PRELOAD: Setting up new-file-detected listener');
     ipcRenderer.on('new-file-detected', (event, data) => {
       console.log('🔍 PRELOAD: Received new-file-detected event:', data);
@@ -42,6 +52,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeAllListeners: (channel: string) => {
     ipcRenderer.removeAllListeners(channel);
   },
+
+  // System integration and file preview
+  openPath: (path: string) => ipcRenderer.send('open-path', path),
+  showItemInFolder: (path: string) => ipcRenderer.send('show-item-in-folder', path),
+  openFile: (filePath: string) => ipcRenderer.invoke('open-file', filePath),
 });
 
 console.log('🔍 PRELOAD: electronAPI exposed successfully');
