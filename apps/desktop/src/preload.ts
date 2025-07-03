@@ -31,6 +31,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCurrentFolder: () => ipcRenderer.invoke('get-current-folder'),
   isFirstRun: () => ipcRenderer.invoke('is-first-run'),
 
+  // Environment variables
+  getEnvVars: () => ipcRenderer.invoke('get-env-vars'),
+
   // Task 2B: Duplicate Detection & Smart Tagging
   getFileAnalysis: (filePath: string) =>
     ipcRenderer.invoke('get-file-analysis', filePath),

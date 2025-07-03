@@ -837,8 +837,6 @@ export class FileStateManager {
       entry.contentTags = smartTags.map(tag => tag.tag);
       entry.suggestedFolder = folderSuggestion.suggestedPath;
       
-      console.log(`🏷️ Updated file analysis: ${path.basename(filePath)} - Category: ${analysis.category}, Tags: ${entry.contentTags?.length || 0}, Folder: ${folderSuggestion.confidence > 0.5 ? 'suggested' : 'current'}`);
-      
     } catch (error) {
       console.error('Error updating file with analysis:', error);
     }

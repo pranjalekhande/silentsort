@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { formatDetectionWorkflow, FormatDetectionResult } from './format-detection-workflow';
+import { n8nAutomationService } from './n8n-automation';
 
 // Use require for pdf-parse to avoid TypeScript import issues
 const pdfParse = require('pdf-parse');
@@ -203,6 +204,9 @@ class AIService {
       // 🎯 Apply Smart Format Detection & Application
       console.log('🎨 Applying format detection workflow...');
       const formatResult = await this.applyFormatDetection(filePath, aiResult);
+      
+      // 🚀 Trigger Finance Automation for financial documents
+      await this.triggerFinanceAutomation(filePath, formatResult);
       
       return formatResult;
       
@@ -445,6 +449,54 @@ Only respond with valid JSON, no additional text.`;
         reasoning: 'Failed to parse AI response',
         error: 'Invalid JSON response from AI',
       };
+    }
+  }
+
+  // 🚀 Finance Automation Integration
+  private async triggerFinanceAutomation(filePath: string, aiResult: FileAnalysisResult): Promise<void> {
+    try {
+      // Only trigger automation for financial documents
+      if (!['invoice', 'receipt', 'financial'].includes(aiResult.category)) {
+        return;
+      }
+
+      console.log('💰 Triggering finance automation for:', path.basename(filePath));
+
+      // Transform AI result to automation payload
+      const automationPayload = {
+        fileName: path.basename(filePath),
+        filePath: filePath,
+        fileCategory: aiResult.category as 'invoice' | 'receipt' | 'financial',
+        
+        // Extract financial entities
+        invoiceNumber: aiResult.extracted_entities?.invoice_number,
+        amount: aiResult.extracted_entities?.amount,
+        vendor: aiResult.extracted_entities?.company,
+        company: aiResult.extracted_entities?.company,
+        
+        // Additional context
+        confidence: aiResult.confidence,
+        contentSummary: aiResult.contentSummary,
+        suggestedFolder: `/Documents/${aiResult.category === 'invoice' ? 'Invoices' : 'Receipts'}/`,
+        
+        // Processing metadata
+        processedAt: new Date().toISOString(),
+        extractionSource: 'ai' as const
+      };
+
+      // Call the automation service
+      const automationResult = await n8nAutomationService.processFinancialDocument(automationPayload);
+      
+      console.log('🎯 Finance automation result:', {
+        success: automationResult.success,
+        triggeredWorkflows: automationResult.triggeredWorkflows,
+        executionTime: automationResult.executionTime,
+        error: automationResult.error
+      });
+
+    } catch (error) {
+      console.error('❌ Finance automation failed:', error);
+      // Don't throw error - automation failure shouldn't break file processing
     }
   }
 

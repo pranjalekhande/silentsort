@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import './FileReviewCard.css';
+import EmailPreviewModal from './EmailPreviewModal';
+import CalendarPreviewModal from './CalendarPreviewModal';
+import { N8NAutomationService } from '../services/n8n-automation';
 
 interface DuplicateInfo {
   isDuplicate: boolean;
@@ -68,6 +71,15 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
   const [editedName, setEditedName] = useState(file.suggestedName);
   const [showDetails, setShowDetails] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  
+  // Automation modal states
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [showAutomation, setShowAutomation] = useState(false);
+  const [automationStatus, setAutomationStatus] = useState<{
+    email: 'idle' | 'sent' | 'failed';
+    calendar: 'idle' | 'added' | 'failed';
+  }>({ email: 'idle', calendar: 'idle' });
 
   const getFileIcon = (fileName: string, category: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
@@ -117,6 +129,191 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
         notification.parentNode.removeChild(notification);
       }
     }, 3000);
+  };
+
+  // Automation helper functions
+  const isFinancialDocument = () => {
+    return ['invoice', 'receipt', 'financial'].includes(file.category.toLowerCase());
+  };
+
+  const hasAutomationData = () => {
+    return file.extracted_entities?.company || file.extracted_entities?.amount || file.extracted_entities?.invoice_number;
+  };
+
+  const shouldShowAutomationButton = () => {
+    return isFinancialDocument() && hasAutomationData();
+  };
+
+  const toggleAutomation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowAutomation(!showAutomation);
+  };
+
+  const generateEmailData = () => {
+    const vendor = file.extracted_entities?.company || 'Unknown Vendor';
+    const amount = file.extracted_entities?.amount || '';
+    const invoiceNumber = file.extracted_entities?.invoice_number || '';
+    
+    return {
+      subject: `New ${file.category}: ${vendor} ${amount}`,
+      body: `A new ${file.category} has been processed by SilentSort:
+
+📄 File: ${file.suggestedName}
+🏢 Vendor: ${vendor}
+${amount ? `💰 Amount: ${amount}` : ''}
+${invoiceNumber ? `📋 Invoice #: ${invoiceNumber}` : ''}
+
+📁 Suggested Location: ${file.folderSuggestion?.path || 'Not specified'}
+🎯 AI Confidence: ${Math.round(file.confidence * 100)}%
+
+🤖 Analysis: ${file.reasoning}
+
+Processed automatically by SilentSort at ${new Date().toISOString()}`,
+      priority: (amount && parseFloat(amount.replace(/[^0-9.]/g, '')) > 1000) ? 'high' as const : 'normal' as const
+    };
+  };
+
+  const generateCalendarData = () => {
+    const vendor = file.extracted_entities?.company || 'Unknown Vendor';
+    const amount = file.extracted_entities?.amount || '';
+    const invoiceNumber = file.extracted_entities?.invoice_number || '';
+    
+    // For demo purposes, set due date to 30 days from now if not available
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+    const dueDateString = dueDate.toISOString().split('T')[0];
+    
+    return {
+      title: `Payment Due: ${vendor} ${amount}`,
+      description: `Payment reminder for ${file.category}
+
+${vendor ? `Vendor: ${vendor}` : ''}
+${amount ? `Amount: ${amount}` : ''}
+${invoiceNumber ? `Invoice: ${invoiceNumber}` : ''}
+
+File: ${file.suggestedName}
+Processed by SilentSort`,
+      dueDate: dueDateString,
+      reminders: [
+        { method: 'email' as const, minutes: 1440 }, // 1 day before
+        { method: 'popup' as const, minutes: 480 },  // 8 hours before
+        { method: 'email' as const, minutes: 60 }    // 1 hour before
+      ]
+    };
+  };
+
+  const handleEmailAutomation = async () => {
+    try {
+      // Set loading state
+      setAutomationStatus(prev => ({ ...prev, email: 'idle' }));
+      
+      // Get environment variables from main process
+      const envVars = await window.electronAPI.getEnvVars();
+      const automationService = new N8NAutomationService({
+        webhookUrl: envVars.N8N_WEBHOOK_URL
+      });
+      const payload = {
+        fileName: file.suggestedName,
+        filePath: file.originalName,
+        fileCategory: file.category.toLowerCase().includes('invoice') ? 'invoice' as const : 'financial' as const,
+        invoiceNumber: file.extracted_entities?.invoice_number,
+        amount: file.extracted_entities?.amount,
+        vendor: file.extracted_entities?.company,
+        company: file.extracted_entities?.company,
+        confidence: file.confidence,
+        contentSummary: file.reasoning,
+        suggestedFolder: file.folderSuggestion?.path,
+        processedAt: new Date().toISOString(),
+        extractionSource: 'ai' as const
+      };
+      
+      console.log('📧 Attempting to send email notification...');
+      const result = await automationService.processFinancialDocument(payload);
+      
+      // Check if email workflow was actually triggered
+      const emailTriggered = result.triggeredWorkflows.includes('Email Notification');
+      
+      if (result.success && emailTriggered) {
+        setAutomationStatus(prev => ({ ...prev, email: 'sent' }));
+        showSuccess('✅ Email notification sent successfully!');
+      } else if (result.success && !emailTriggered) {
+        // Service is in fallback mode - show different message
+        setAutomationStatus(prev => ({ ...prev, email: 'failed' }));
+        showSuccess('⚠️ Email automation is in demo mode. Check n8n webhook configuration.');
+      } else {
+        // Actual failure
+        setAutomationStatus(prev => ({ ...prev, email: 'failed' }));
+        const errorMsg = result.error || 'Unknown error occurred';
+        showSuccess(`❌ Email automation failed: ${errorMsg}`);
+        console.error('❌ Email automation failed:', result.error);
+      }
+      
+      setIsEmailModalOpen(false);
+      
+    } catch (error) {
+      console.error('Email automation failed:', error);
+      setAutomationStatus(prev => ({ ...prev, email: 'failed' }));
+      showSuccess('❌ Email automation failed. Please check your n8n webhook configuration.');
+    }
+  };
+
+  const handleCalendarAutomation = async () => {
+    try {
+      // Set loading state
+      setAutomationStatus(prev => ({ ...prev, calendar: 'idle' }));
+      
+      // Get environment variables from main process
+      const envVars = await window.electronAPI.getEnvVars();
+      
+      const automationService = new N8NAutomationService({
+        webhookUrl: envVars.N8N_WEBHOOK_URL
+      });
+      
+      const calendarData = generateCalendarData();
+      
+      const payload = {
+        fileName: file.suggestedName,
+        filePath: file.originalName,
+        fileCategory: file.category.toLowerCase().includes('invoice') ? 'invoice' as const : 'financial' as const,
+        invoiceNumber: file.extracted_entities?.invoice_number,
+        amount: file.extracted_entities?.amount,
+        vendor: file.extracted_entities?.company,
+        company: file.extracted_entities?.company,
+        dueDate: calendarData.dueDate,
+        confidence: file.confidence,
+        contentSummary: file.reasoning,
+        suggestedFolder: file.folderSuggestion?.path,
+        processedAt: new Date().toISOString(),
+        extractionSource: 'ai' as const
+      };
+      
+      const result = await automationService.processFinancialDocument(payload);
+      
+      // Check if calendar workflow was actually triggered
+      const calendarTriggered = result.triggeredWorkflows.includes('Calendar Reminder');
+      
+      if (result.success && calendarTriggered) {
+        setAutomationStatus(prev => ({ ...prev, calendar: 'added' }));
+        showSuccess('✅ Calendar reminder added successfully!');
+      } else if (result.success && !calendarTriggered) {
+        // Service is in fallback mode - show different message
+        setAutomationStatus(prev => ({ ...prev, calendar: 'failed' }));
+        showSuccess('⚠️ Calendar automation is in demo mode. Check n8n webhook configuration.');
+      } else {
+        // Actual failure
+        setAutomationStatus(prev => ({ ...prev, calendar: 'failed' }));
+        const errorMsg = result.error || 'Unknown error occurred';
+        showSuccess(`❌ Calendar automation failed: ${errorMsg}`);
+        console.error('❌ Calendar automation failed:', result.error);
+      }
+      
+      setIsCalendarModalOpen(false);
+      
+    } catch (error) {
+      console.error('❌ Calendar automation error:', error);
+      setAutomationStatus(prev => ({ ...prev, calendar: 'failed' }));
+      showSuccess('❌ Calendar automation failed. Please check your n8n webhook configuration.');
+    }
   };
 
   const handleKeepBoth = () => {
@@ -191,6 +388,36 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
   if (file.extracted_entities?.technology?.length) {
     keyEntities.push(`⚡ ${file.extracted_entities.technology.slice(0, 2).join(', ')}`);
   }
+
+  // Unified tags function - combines all tag types without duplication
+  const getAllTags = () => {
+    const allTags = new Set<string>();
+    
+    // Add technical tags
+    if (file.technical_tags) {
+      file.technical_tags.forEach(tag => allTags.add(tag));
+    }
+    
+    // Add smart tags
+    if (file.smartTags) {
+      file.smartTags.forEach(tag => allTags.add(tag));
+    }
+    
+    // Add extracted entities as tags
+    if (file.extracted_entities) {
+      Object.entries(file.extracted_entities).forEach(([key, value]) => {
+        if (value && !['company', 'amount'].includes(key)) { // Skip company and amount as they're shown in key entities
+          if (Array.isArray(value)) {
+            value.forEach(v => allTags.add(`${key}: ${v}`));
+          } else {
+            allTags.add(`${key}: ${value}`);
+          }
+        }
+      });
+    }
+    
+    return Array.from(allTags);
+  };
 
   // Check for duplicates
   const hasDuplicates = file.duplicateInfo?.isDuplicate && file.duplicateInfo.duplicateFiles.length > 0;
@@ -271,11 +498,11 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
                 </div>
               )}
 
-              {/* Smart tags in expanded view only */}
-              {file.smartTags && file.smartTags.length > 0 && (
-                <div className="compact-smart-tags">
-                  {file.smartTags.map((tag, i) => (
-                    <span key={i} className="compact-tag">{tag}</span>
+              {/* Unified tags section */}
+              {getAllTags().length > 0 && (
+                <div className="unified-tags">
+                  {getAllTags().map((tag, i) => (
+                    <span key={i} className="unified-tag">{tag}</span>
                   ))}
                 </div>
               )}
@@ -392,6 +619,70 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
         </div>
       )}
 
+      {/* Automation Section - Only for financial documents */}
+      {shouldShowAutomationButton() && showAutomation && (
+        <div className="automation-section">
+          <div className="automation-header">
+            <h4>🤖 Finance Automation</h4>
+            <span className="automation-subtitle">
+              Automate notifications and reminders for this {file.category}
+            </span>
+          </div>
+          
+          <div className="automation-actions">
+            <button
+              className={`automation-btn email-btn ${automationStatus.email === 'sent' ? 'completed' : ''}`}
+              onClick={() => setIsEmailModalOpen(true)}
+              disabled={automationStatus.email === 'sent'}
+            >
+              {automationStatus.email === 'sent' ? '📧 Sent' : 
+               automationStatus.email === 'failed' ? '📧 Failed' : 
+               '📧 Send Email'}
+            </button>
+            
+            <button
+              className={`automation-btn calendar-btn ${automationStatus.calendar === 'added' ? 'completed' : ''}`}
+              onClick={() => setIsCalendarModalOpen(true)}
+              disabled={automationStatus.calendar === 'added'}
+            >
+              {automationStatus.calendar === 'added' ? '📅 Added' : 
+               automationStatus.calendar === 'failed' ? '📅 Failed' : 
+               '📅 Add Reminder'}
+            </button>
+          </div>
+          
+          <div className="automation-summary">
+            <div className="summary-item">
+              <span className="summary-label">Vendor:</span>
+              <span className="summary-value">{file.extracted_entities?.company || 'Unknown'}</span>
+            </div>
+            {file.extracted_entities?.amount && (
+              <div className="summary-item">
+                <span className="summary-label">Amount:</span>
+                <span className="summary-value">{file.extracted_entities.amount}</span>
+              </div>
+            )}
+            {file.extracted_entities?.invoice_number && (
+              <div className="summary-item">
+                <span className="summary-label">Invoice #:</span>
+                <span className="summary-value">{file.extracted_entities.invoice_number}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Automation Button - Golden Thunder */}
+      {shouldShowAutomationButton() && (
+        <button
+          className={`automation-fab ${showAutomation ? 'active' : ''}`}
+          onClick={toggleAutomation}
+          title={showAutomation ? 'Hide Automation' : 'Show Automation Options'}
+        >
+          ⚡
+        </button>
+      )}
+
       {/* Detailed analysis section */}
       {showDetails && (
         <div className="card-details">
@@ -399,47 +690,6 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
             <strong>Analysis:</strong>
             <span>{file.reasoning}</span>
           </div>
-          
-          {file.technical_tags && file.technical_tags.length > 0 && (
-            <div className="detail-row">
-              <strong>Tags:</strong>
-              <div className="tags">
-                {file.technical_tags.map((tag, i) => (
-                  <span key={i} className="tag">{tag}</span>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {file.extracted_entities && (
-            <div className="detail-row">
-              <strong>Extracted:</strong>
-              <div className="extracted-info">
-                {Object.entries(file.extracted_entities).map(([key, value]) => {
-                  if (!value || (Array.isArray(value) && value.length === 0)) {
-                    return null;
-                  }
-                  const displayValue = Array.isArray(value) ? value.join(', ') : value;
-                  return (
-                    <span key={key} className="extracted-item">
-                      {key.replace('_', ' ')}: {displayValue}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {file.smartTags && file.smartTags.length > 0 && (
-            <div className="detail-row">
-              <strong>Smart Tags:</strong>
-              <div className="smart-tags-list">
-                {file.smartTags.map((tag, i) => (
-                  <span key={i} className="smart-tag">{tag}</span>
-                ))}
-              </div>
-            </div>
-          )}
           
           {file.processing_time_ms && (
             <div className="detail-row">
@@ -456,6 +706,37 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
           )}
         </div>
       )}
+
+      {/* Email Preview Modal */}
+      <EmailPreviewModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        onSend={handleEmailAutomation}
+        emailData={generateEmailData()}
+        fileData={{
+          fileName: file.suggestedName,
+          vendor: file.extracted_entities?.company,
+          amount: file.extracted_entities?.amount,
+          invoiceNumber: file.extracted_entities?.invoice_number,
+          category: file.category
+        }}
+      />
+
+      {/* Calendar Preview Modal */}
+      <CalendarPreviewModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        onAddToCalendar={handleCalendarAutomation}
+        calendarData={generateCalendarData()}
+        fileData={{
+          fileName: file.suggestedName,
+          vendor: file.extracted_entities?.company,
+          amount: file.extracted_entities?.amount,
+          invoiceNumber: file.extracted_entities?.invoice_number,
+          dueDate: generateCalendarData().dueDate,
+          category: file.category
+        }}
+      />
     </div>
   );
 };

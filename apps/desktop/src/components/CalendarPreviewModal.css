@@ -1,0 +1,290 @@
+.calendar-preview-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 650px;
+  max-height: 85vh;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.calendar-preview-modal .modal-header {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+}
+
+.calendar-preview-modal .modal-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 80px; /* Space for footer */
+}
+
+.calendar-details {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.event-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.event-title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-title label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.title-text {
+  padding: 12px 16px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 1.05rem;
+}
+
+.due-date-info {
+  padding: 16px;
+  background: #fef3c7;
+  border-radius: 8px;
+  border: 1px solid #f59e0b;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.due-date {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.due-label {
+  font-weight: 600;
+  color: #92400e;
+  font-size: 0.9rem;
+}
+
+.due-value {
+  font-weight: 700;
+  color: #92400e;
+  font-size: 1rem;
+}
+
+.due-status {
+  display: flex;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-badge.overdue {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.status-badge.today {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+.status-badge.upcoming {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #86efac;
+}
+
+.event-description {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-description label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.description-text {
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: #1e293b;
+  font-size: 0.9rem;
+  min-height: 80px;
+}
+
+.reminders-section {
+  padding: 16px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  border: 1px solid #0ea5e9;
+}
+
+.reminders-section h4 {
+  margin: 0 0 12px 0;
+  color: #0c4a6e;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.reminders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reminder-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #bae6fd;
+}
+
+.reminder-icon {
+  font-size: 1.1rem;
+  width: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.reminder-text {
+  font-size: 0.9rem;
+  color: #0c4a6e;
+  font-weight: 500;
+}
+
+.file-summary {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 20px;
+}
+
+.file-summary h4 {
+  margin: 0 0 16px 0;
+  color: #374151;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.summary-value {
+  font-size: 0.9rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.calendar-preview-modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+.add-calendar-btn {
+  padding: 12px 24px;
+  border: none;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
+  font-size: 0.95rem;
+}
+
+.add-calendar-btn:hover {
+  background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%);
+  box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .calendar-preview-modal {
+    width: 95%;
+    max-height: 90vh;
+  }
+  
+  .event-header {
+    gap: 12px;
+  }
+  
+  .due-date-info {
+    padding: 12px;
+  }
+  
+  .due-date {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .reminders-section {
+    padding: 12px;
+  }
+  
+  .reminder-item {
+    padding: 6px 10px;
+  }
+  
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .calendar-preview-modal .modal-footer {
+    padding: 16px 20px;
+  }
+} 

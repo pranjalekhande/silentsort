@@ -137,6 +137,9 @@ export interface ElectronAPI {
   getCurrentFolder: () => Promise<string>;
   isFirstRun: () => Promise<boolean>;
   
+  // Environment variables
+  getEnvVars: () => Promise<{ N8N_WEBHOOK_URL?: string; N8N_WEBHOOK_KEY?: string }>;
+  
   // Event listeners
   onNewFileDetected: (callback: (data: { filePath: string; aiResult: AIResult; fileHash?: string }) => void) => void;
   onFocusSearch: (callback: () => void) => void;

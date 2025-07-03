@@ -14,8 +14,11 @@ import * as chokidar from 'chokidar';
 import { aiService } from './services/ai-service';
 import { FileStateManager } from './services/file-state-manager';
 
-// Load environment variables
-require('dotenv').config();
+// Load environment variables from the correct location
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+
+// Also try loading from the desktop directory as fallback
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 // Simple settings management
 interface Settings {
@@ -281,9 +284,6 @@ class SilentSortApp {
         const aiResult = await aiService.analyzeFile(filePath);
         console.log('✅ AI analysis completed for:', fileName, '- Confidence:', aiResult.confidence);
 
-        // Task 2B: Enhanced analysis with duplicate detection and smart tagging
-        console.log('🔍 Performing duplicate detection and smart tagging...');
-        
         // Update file registry with AI analysis results
         await this.fileStateManager.updateFileWithAnalysis(filePath, {
           category: aiResult.category,
@@ -295,15 +295,6 @@ class SilentSortApp {
         // Get comprehensive file analysis including duplicates
         const comprehensiveAnalysis = await this.fileStateManager.getFileAnalysis(filePath);
         
-        console.log('🏷️ Enhanced analysis completed:', {
-          file: fileName,
-          duplicates: comprehensiveAnalysis.duplicateAnalysis.isDuplicate,
-          duplicateCount: comprehensiveAnalysis.duplicateAnalysis.duplicateFiles.length,
-          similarCount: comprehensiveAnalysis.duplicateAnalysis.similarFiles.length,
-          tags: comprehensiveAnalysis.smartTags.length,
-          folderSuggested: comprehensiveAnalysis.folderSuggestion.confidence > 0.5
-        });
-
         // Send enhanced file data to renderer
         if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
           this.mainWindow.webContents.send('new-file-detected', {
@@ -430,15 +421,8 @@ class SilentSortApp {
 
     // New Task 2B: Duplicate Detection & Smart Tagging IPC handlers
     ipcMain.handle('get-file-analysis', async (event, filePath: string) => {
-      console.log('🔍 Getting comprehensive file analysis:', path.basename(filePath));
       try {
         const analysis = await this.fileStateManager.getFileAnalysis(filePath);
-        console.log('✅ File analysis completed:', {
-          file: path.basename(filePath),
-          isDuplicate: analysis.duplicateAnalysis.isDuplicate,
-          tagsCount: analysis.smartTags.length,
-          folderSuggested: analysis.folderSuggestion.confidence > 0.5
-        });
         return analysis;
       } catch (error) {
         console.error('❌ Failed to get file analysis:', error);
@@ -488,6 +472,14 @@ class SilentSortApp {
 
     ipcMain.handle('get-current-folder', async () => {
       return store.get('watchFolder');
+    });
+
+    // Environment variables handler for renderer process
+    ipcMain.handle('get-env-vars', async () => {
+      return {
+        N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL,
+        N8N_WEBHOOK_KEY: process.env.N8N_WEBHOOK_KEY,
+      };
     });
 
     ipcMain.handle('is-first-run', async () => {

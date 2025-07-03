@@ -194,7 +194,6 @@ const App: React.FC = () => {
     };
 
     setFiles(prev => [newFile, ...prev]);
-    console.log('✅ File added to UI with AI analysis:', newFile);
   };
 
   const handleNewFile = async (filePath: string) => {
@@ -318,8 +317,6 @@ const App: React.FC = () => {
   const handleKeepBoth = async (fileId: string) => {
     const file = files.find(f => f.id === fileId);
     if (!file) return;
-
-    console.log('📁 Keep Both action for file:', file.originalName);
     
     // Update file status to approved (keep both means we rename the new file as suggested)
     setFiles(prev =>
@@ -337,12 +334,6 @@ const App: React.FC = () => {
   const handleReplaceWithBetter = async (fileId: string, betterPath: string) => {
     const file = files.find(f => f.id === fileId);
     if (!file || !file.duplicateInfo?.betterVersion) return;
-
-    console.log('🔄 Replace with Better action:', {
-      currentFile: file.originalName,
-      betterFile: betterPath,
-      reason: file.duplicateInfo.betterVersion.reason
-    });
 
     // Update file status to approved
     setFiles(prev =>
@@ -364,11 +355,6 @@ const App: React.FC = () => {
   const handleDeleteDuplicates = async (fileId: string, duplicatePaths: string[]) => {
     const file = files.find(f => f.id === fileId);
     if (!file) return;
-
-    console.log('🗑️ Delete Duplicates action:', {
-      keepFile: file.originalName,
-      deleteFiles: duplicatePaths
-    });
 
     // Update file status to approved (we keep this file, delete others)
     setFiles(prev =>
