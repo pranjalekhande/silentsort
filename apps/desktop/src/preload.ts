@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('process-file-content', filePath),
   renameFile: (oldPath: string, newPath: string) =>
     ipcRenderer.invoke('rename-file', oldPath, newPath),
+  moveFileToFolder: (filePath: string, targetPath: string, createFolder: boolean) =>
+    ipcRenderer.invoke('move-file-to-folder', filePath, targetPath, createFolder),
 
   // AI testing
   testAIService: () => ipcRenderer.invoke('test-ai-service'),

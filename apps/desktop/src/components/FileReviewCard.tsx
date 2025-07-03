@@ -54,6 +54,7 @@ interface FileReviewCardProps {
   onReplaceWithBetter?: (fileId: string, betterPath: string, callback: (success: boolean, message: string) => void) => void;
   onDeleteDuplicates?: (fileId: string, duplicatePaths: string[], callback: (success: boolean, message: string) => void) => void;
   onPreviewFile?: (filePath: string) => void;
+  onMoveToFolder?: (fileId: string, targetPath: string, createFolder: boolean, callback: (success: boolean, message: string, newPath?: string) => void) => void;
 }
 
 const FileReviewCard: React.FC<FileReviewCardProps> = ({
@@ -66,11 +67,13 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
   onReplaceWithBetter,
   onDeleteDuplicates,
   onPreviewFile,
+  onMoveToFolder,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(file.suggestedName);
   const [showDetails, setShowDetails] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [showFolderSuggestion, setShowFolderSuggestion] = useState(false);
   
   // Automation modal states
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -133,7 +136,13 @@ const FileReviewCard: React.FC<FileReviewCardProps> = ({
 
   // Automation helper functions
   const isFinancialDocument = () => {
-    return ['invoice', 'receipt', 'financial'].includes(file.category.toLowerCase());
+    // Include 'document' category if it has financial entities (quick fix)
+    const isFinancialCategory = ['invoice', 'receipt', 'financial'].includes(file.category.toLowerCase());
+    const isDocumentWithFinancialData = file.category.toLowerCase() === 'document' && 
+      (file.extracted_entities?.amount || file.extracted_entities?.invoice_number || 
+       file.originalName?.toLowerCase().includes('invoice'));
+    
+    return isFinancialCategory || isDocumentWithFinancialData;
   };
 
   const hasAutomationData = () => {
@@ -352,6 +361,50 @@ Processed by SilentSort`,
     }
   };
 
+  const handleMoveToExistingFolder = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (onMoveToFolder && file.folderSuggestion) {
+      setActionInProgress('move');
+      onMoveToFolder(
+        file.id, 
+        file.folderSuggestion.path, 
+        false, // Don't create folder - expect it to exist
+        (success: boolean, message: string, newPath?: string) => {
+          setActionInProgress(null);
+          if (success) {
+            const folderName = (newPath || file.folderSuggestion?.path)?.split('/').pop() || 'destination folder';
+            showSuccess(`✅ File successfully moved to "${folderName}" folder!`);
+          } else {
+            showSuccess(`❌ Move failed: ${message}`);
+          }
+        }
+      );
+    }
+  };
+
+  const handleCreateAndMoveToFolder = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (onMoveToFolder && file.folderSuggestion) {
+      setActionInProgress('create');
+      onMoveToFolder(
+        file.id, 
+        file.folderSuggestion.path, 
+        true, // Create folder if needed
+        (success: boolean, message: string, newPath?: string) => {
+          setActionInProgress(null);
+          if (success) {
+            const folderName = (newPath || file.folderSuggestion?.path)?.split('/').pop() || 'destination folder';
+            showSuccess(`✅ Folder created! File moved to "${folderName}" folder successfully!`);
+          } else {
+            showSuccess(`❌ Create & move failed: ${message}`);
+          }
+        }
+      );
+    }
+  };
+
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsEditing(true);
@@ -504,6 +557,54 @@ Processed by SilentSort`,
                   {getAllTags().map((tag, i) => (
                     <span key={i} className="unified-tag">{tag}</span>
                   ))}
+                </div>
+              )}
+
+              {/* Folder Suggestion Section */}
+              {file.folderSuggestion && (
+                <div className="folder-suggestion-section">
+                  <div 
+                    className="folder-suggestion-header"
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setShowFolderSuggestion(!showFolderSuggestion); 
+                    }}
+                  >
+                    <span className="folder-suggestion-label">📁 Suggested Folder</span>
+                    <span className={`folder-confidence confidence-${getConfidenceColor(file.folderSuggestion.confidence)}`}>
+                      {Math.round(file.folderSuggestion.confidence * 100)}%
+                    </span>
+                    <button className={`folder-toggle ${showFolderSuggestion ? 'expanded' : ''}`}>
+                      ⌄
+                    </button>
+                  </div>
+                  
+                  {showFolderSuggestion && (
+                    <div className="folder-suggestion-content">
+                      <div className="suggested-folder-path">
+                        {file.folderSuggestion.path}
+                      </div>
+                      <div className="folder-reasoning">
+                        {file.folderSuggestion.reasoning}
+                      </div>
+                      <div className="folder-actions">
+                        <button 
+                          className={`action-btn folder-move ${actionInProgress === 'move' ? 'loading' : ''}`}
+                          onClick={handleMoveToExistingFolder}
+                          disabled={!!actionInProgress}
+                        >
+                          {actionInProgress === 'move' ? '⏳' : '📁'} Move Here
+                        </button>
+                        <button 
+                          className={`action-btn folder-create ${actionInProgress === 'create' ? 'loading' : ''}`}
+                          onClick={handleCreateAndMoveToFolder}
+                          disabled={!!actionInProgress}
+                        >
+                          {actionInProgress === 'create' ? '⏳' : '➕'} Create & Move
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>

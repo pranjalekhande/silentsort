@@ -9,7 +9,11 @@ import json
 import time
 import asyncio
 from datetime import datetime
-from typing import TypedDict, List, Optional, Dict, Any, Annotated
+try:
+    from typing import TypedDict, List, Optional, Dict, Any, Annotated
+except ImportError:
+    from typing import TypedDict, List, Optional, Dict, Any
+    from typing_extensions import Annotated
 from enum import Enum
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -62,6 +66,7 @@ class FileProcessingState(TypedDict):
     file_extension: str
     file_size: int
     content_preview: str
+    base_directory: Optional[str]  # NEW: Base directory for folder suggestions
     
     # Processing messages (LangGraph pattern)
     messages: Annotated[List[BaseMessage], add_messages]
@@ -71,6 +76,10 @@ class FileProcessingState(TypedDict):
     naming_suggestions: Optional[List[str]]
     category_analysis: Optional[str]
     confidence_scores: Optional[Dict[str, float]]
+    
+    # NEW: Folder Intelligence Results  
+    folder_suggestions: Optional[List[Dict[str, Any]]]
+    folder_analysis: Optional[Dict[str, Any]]
     
     # Final Results
     suggested_name: Optional[str]
@@ -100,6 +109,7 @@ class FileAnalysisRequest(BaseModel):
     file_size: int
     file_extension: str
     content_preview: Optional[str] = None
+    base_directory: Optional[str] = None  # NEW: For folder suggestions
 
 class FileAnalysisResponse(BaseModel):
     suggested_name: str
@@ -108,6 +118,7 @@ class FileAnalysisResponse(BaseModel):
     reasoning: str
     alternatives: List[str] = []
     content_summary: Optional[str] = None
+    folder_suggestions: List[Dict[str, Any]] = []
     processing_time_ms: int
     workflow_id: Optional[str] = None
     processing_stages: List[str] = []
@@ -263,7 +274,7 @@ Provide analysis in JSON format:
             }
     
     async def parallel_processing_node(self, state: FileProcessingState) -> Dict[str, Any]:
-        """Run parallel AI agents for naming, categorization, and confidence"""
+        """Run parallel AI agents for naming, categorization, confidence, and folder intelligence"""
         logger.info(f"⚡ Running parallel processing for: {state['original_filename']}")
         
         try:
@@ -272,22 +283,26 @@ Provide analysis in JSON format:
                 "content_analysis": state.get("content_analysis", {}),
                 "original_filename": state["original_filename"],
                 "file_extension": state["file_extension"],
-                "content_preview": state.get("content_preview", "")
+                "content_preview": state.get("content_preview", ""),
+                "base_directory": state.get("base_directory", "")
             }
             
             # Run agents sequentially (simulating parallel for simplicity)
             naming_result = await self._naming_agent(input_data)
             category_result = await self._categorization_agent(input_data)
             confidence_result = await self._confidence_agent(input_data)
+            folder_result = await self._folder_intelligence_agent(input_data)
             
             parallel_msg = HumanMessage(
-                content=f"Parallel processing complete: {len(naming_result.get('suggestions', []))} name suggestions"
+                content=f"Parallel processing complete: {len(naming_result.get('suggestions', []))} name suggestions, {len(folder_result.get('suggestions', []))} folder suggestions"
             )
             
             return {
                 "naming_suggestions": naming_result.get("suggestions", []),
                 "category_analysis": category_result.get("category", "document"),
                 "confidence_scores": confidence_result.get("scores", {}),
+                "folder_suggestions": folder_result.get("suggestions", []),
+                "folder_analysis": folder_result.get("analysis", {}),
                 "processing_stage": "parallel_processing",
                 "messages": [parallel_msg],
                 "operation_metadata": {
@@ -500,6 +515,100 @@ Return JSON: {{"category": "document", "subcategory": "invoice"}}"""
                 "naming": overall_confidence * 0.9
             }
         }
+    
+    async def _folder_intelligence_agent(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """NEW: Specialized agent for folder organization suggestions"""
+        content_analysis = input_data.get('content_analysis', {})
+        base_dir = input_data.get('base_directory', '')
+        original_filename = input_data.get('original_filename', '')
+        
+        prompt = f"""You are a folder organization expert. Suggest the best folder structure for this file:
+
+File: {original_filename}
+Base Directory: {base_dir}
+Content Analysis: {json.dumps(content_analysis, indent=2)}
+
+Generate folder suggestions that create logical organization within the base directory.
+
+Requirements:
+- Suggest 1-3 folder paths within the base directory
+- Use clear, descriptive folder names  
+- Consider the content type and business context
+- Create nested folders for better organization
+- Paths should be relative to base directory
+
+Return JSON:
+{{
+    "suggestions": [
+        {{
+            "path": "Finance/Invoices",
+            "confidence": 0.95,
+            "reasoning": "Invoice document belongs in Finance/Invoices folder",
+            "category": "finance"
+        }},
+        {{
+            "path": "Work/Meetings",
+            "confidence": 0.85, 
+            "reasoning": "Meeting notes belong in Work/Meetings folder",
+            "category": "work"
+        }}
+    ],
+    "analysis": {{
+        "organization_strategy": "category-based",
+        "primary_context": "business",
+        "recommended_depth": 2
+    }}
+}}"""
+
+        try:
+            response = await self.llm.ainvoke([HumanMessage(content=prompt)])
+            result = json.loads(response.content)
+            
+            # Ensure paths include base directory
+            for suggestion in result.get('suggestions', []):
+                if base_dir and not suggestion['path'].startswith(base_dir):
+                    suggestion['path'] = f"{base_dir}/{suggestion['path']}"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Folder intelligence agent failed: {e}")
+            # Fallback folder suggestions
+            content_type = content_analysis.get('content_type', 'document')
+            fallback_path = self._get_fallback_folder_path(content_type, base_dir)
+            
+            return {
+                "suggestions": [
+                    {
+                        "path": fallback_path,
+                        "confidence": 0.7,
+                        "reasoning": f"Fallback organization for {content_type} files",
+                        "category": content_analysis.get('business_context', 'general')
+                    }
+                ],
+                "analysis": {
+                    "organization_strategy": "fallback",
+                    "primary_context": content_analysis.get('business_context', 'general'),
+                    "recommended_depth": 1
+                }
+            }
+    
+    def _get_fallback_folder_path(self, content_type: str, base_dir: str) -> str:
+        """Generate fallback folder path based on content type"""
+        folder_map = {
+            'invoice': 'Finance/Invoices',
+            'receipt': 'Finance/Receipts',
+            'contract': 'Legal/Contracts', 
+            'resume': 'Career/Resume',
+            'meeting-notes': 'Work/Meetings',
+            'report': 'Work/Reports',
+            'code': 'Projects/Code',
+            'image': 'Media/Images',
+            'document': 'Files'
+        }
+        
+        folder_path = folder_map.get(content_type, 'Files')
+        return f"{base_dir}/{folder_path}" if base_dir else folder_path
 
 # ============================================================================
 # WORKFLOW INSTANCE & API ENDPOINTS
@@ -559,7 +668,10 @@ async def analyze_file(request: FileAnalysisRequest):
             "retry_count": 0,
             "folder_context": None,
             "user_patterns": None,
-            "operation_metadata": {}
+            "operation_metadata": {},
+            "base_directory": request.base_directory,
+            "folder_suggestions": None,
+            "folder_analysis": None
         }
         
         # Run workflow
@@ -580,6 +692,7 @@ async def analyze_file(request: FileAnalysisRequest):
             reasoning=final_state.get("reasoning", "LangGraph multi-agent analysis v2.0"),
             alternatives=final_state.get("alternatives", []),
             content_summary=final_state.get("content_analysis", {}).get("content_summary"),
+            folder_suggestions=final_state.get("folder_suggestions", []),
             processing_time_ms=processing_time,
             workflow_id=workflow_id,
             processing_stages=stages_completed

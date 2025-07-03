@@ -369,6 +369,48 @@ const App: React.FC = () => {
     // 3. Update file registry to mark duplicates as handled
   };
 
+  const handleMoveToFolder = async (
+    fileId: string, 
+    targetPath: string, 
+    createFolder: boolean, 
+    callback: (success: boolean, message: string, newPath?: string) => void
+  ) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) {
+      callback(false, 'File not found');
+      return;
+    }
+
+    try {
+      
+      // Call the IPC handler with the actual file path
+      const result = await window.electronAPI.moveFileToFolder(
+        file.originalPath, // Pass the actual file path instead of just fileId
+        targetPath,
+        createFolder
+      );
+
+      if (result.success) {
+        // Update the file status to approved and update the path
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === fileId ? { 
+              ...f, 
+              status: 'approved' as const,
+              originalPath: result.newPath || targetPath // Update the stored path
+            } : f
+          )
+        );
+        callback(true, result.message, result.newPath);
+      } else {
+        callback(false, result.message);
+      }
+    } catch (error) {
+      console.error('❌ Error moving file:', error);
+      callback(false, error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
   const filteredFiles = files.filter(file => {
     const searchLower = searchQuery.toLowerCase();
     
@@ -509,6 +551,7 @@ const App: React.FC = () => {
                   onKeepBoth={handleKeepBoth}
                   onReplaceWithBetter={handleReplaceWithBetter}
                   onDeleteDuplicates={handleDeleteDuplicates}
+                  onMoveToFolder={handleMoveToFolder}
                 />
               );
             } else {

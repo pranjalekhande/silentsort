@@ -427,6 +427,136 @@
   background: linear-gradient(135deg, #0e7490 0%, #0891b2 100%);
 }
 
+/* Folder Suggestion Section */
+.folder-suggestion-section {
+  margin-top: 12px;
+  padding-left: 48px; /* Align with file names */
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.folder-suggestion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #374151;
+  transition: all 0.3s ease;
+}
+
+.folder-suggestion-header:hover {
+  background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+}
+
+.folder-suggestion-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.folder-confidence {
+  /* Uses existing confidence styling */
+}
+
+.folder-toggle {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  transform: rotate(0deg);
+}
+
+.folder-toggle.expanded {
+  transform: rotate(180deg);
+  color: #f59e0b;
+}
+
+.folder-suggestion-content {
+  padding: 16px;
+  border-top: none;
+}
+
+.suggested-folder-path {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #10b981;
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #10b981;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
+  word-break: break-all;
+}
+
+.folder-reasoning {
+  font-size: 0.875rem;
+  color: #d1d5db;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+}
+
+.folder-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.action-btn.folder-move {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+  flex: 1;
+  min-width: 120px;
+}
+
+.action-btn.folder-move:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.action-btn.folder-create {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+  flex: 1;
+  min-width: 120px;
+}
+
+.action-btn.folder-create:hover {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+}
+
 /* Side-by-side file comparison */
 .files-side-by-side {
   display: grid;

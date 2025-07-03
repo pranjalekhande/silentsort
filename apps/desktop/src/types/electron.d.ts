@@ -120,6 +120,7 @@ export interface ElectronAPI {
   // File operations
   processFileContent: (filePath: string) => Promise<AIResult>;
   renameFile: (oldPath: string, newPath: string) => Promise<RenameResult>;
+  moveFileToFolder: (filePath: string, targetPath: string, createFolder: boolean) => Promise<{ success: boolean; message: string; newPath?: string }>;
   
   // AI service
   testAIService: () => Promise<TestResult>;

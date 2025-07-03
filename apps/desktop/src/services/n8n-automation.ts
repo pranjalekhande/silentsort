@@ -105,7 +105,7 @@ export class N8NAutomationService {
           description: 'Create calendar events for invoice due dates'
         },
         driveBackup: {
-          enabled: true,
+          enabled: false, // 🔴 DISABLED - Backup webhook not configured
           webhookUrl: hasValidWebhookUrl ? 
             `${webhookUrl}/finance-backup` : 
             'https://n8n.yourdomain.com/webhook/finance-backup',
@@ -250,19 +250,20 @@ export class N8NAutomationService {
       );
     }
 
-    // 3. Google Drive Backup Workflow
-    if (this.config.workflows.driveBackup.enabled) {
-      workflowPromises.push(
-        this.triggerDriveBackup(payload)
-          .then(() => triggeredWorkflows.push('Drive Backup'))
-          .catch(error => {
-            if (!this.fallbackMode) {
-              hasErrors = true;
-              combinedError += `Drive: ${error.message}; `;
-            }
-          })
-      );
-    }
+    // 3. Google Drive Backup Workflow - DISABLED
+    // 🔴 COMMENTED OUT - Backup webhook not configured
+    // if (this.config.workflows.driveBackup.enabled) {
+    //   workflowPromises.push(
+    //     this.triggerDriveBackup(payload)
+    //       .then(() => triggeredWorkflows.push('Drive Backup'))
+    //       .catch(error => {
+    //         if (!this.fallbackMode) {
+    //           hasErrors = true;
+    //           combinedError += `Drive: ${error.message}; `;
+    //         }
+    //       })
+    //   );
+    // }
 
     // Wait for all workflows to complete
     await Promise.allSettled(workflowPromises);
@@ -356,9 +357,15 @@ export class N8NAutomationService {
   }
 
   /**
-   * Trigger Google Drive backup workflow
+   * Trigger Google Drive backup workflow - DISABLED
+   * 🔴 COMMENTED OUT - Backup webhook not configured
    */
   private async triggerDriveBackup(payload: FinanceAutomationPayload): Promise<void> {
+    // 🔴 DISABLED - Backup webhook returns 404 error
+    console.log('📋 Drive backup disabled - webhook not configured');
+    return;
+    
+    /* COMMENTED OUT - Backup webhook not working
     const backupFolder = this.generateDriveFolderPath(payload);
     
     const webhookData = {
@@ -387,6 +394,7 @@ export class N8NAutomationService {
       webhookData,
       'Drive Backup'
     );
+    */
   }
 
   /**

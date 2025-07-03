@@ -9,7 +9,7 @@ import json
 import time
 import re
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,6 +53,8 @@ class FileAnalysisRequest(BaseModel):
     file_size: int
     file_extension: str
     content_preview: Optional[str] = None
+    base_directory: Optional[str] = None  # NEW: For folder suggestions
+    include_folder_suggestions: Optional[bool] = False  # NEW: Whether to include folder suggestions
 
 class FileAnalysisResponse(BaseModel):
     suggested_name: str
@@ -64,6 +66,7 @@ class FileAnalysisResponse(BaseModel):
     content_summary: Optional[str] = None
     technical_tags: List[str] = []
     extracted_entities: ExtractedEntities
+    folder_suggestions: List[Dict[str, Any]] = []  # NEW: Folder suggestions
     processing_time_ms: int
 
 class HealthResponse(BaseModel):
@@ -209,7 +212,7 @@ def generate_technical_tags(content: str, entities: Dict[str, Any]) -> List[str]
     
     return tags
 
-def determine_category(content: str, entities: Dict[str, Any]) -> tuple[str, str]:
+def determine_category(content: str, entities: Dict[str, Any]) -> Tuple[str, str]:
     """Determine domain-specific category and subcategory with content-first analysis"""
     content_lower = content.lower()
     
@@ -474,8 +477,59 @@ def generate_smart_filename(content: str, entities: Dict[str, Any], category: st
     
     return f"{filename}{original_extension}"
 
+def generate_folder_suggestions(original_name: str, category: str, entities: Dict[str, Any], base_directory: str) -> List[Dict[str, Any]]:
+    """Generate intelligent folder suggestions based on content analysis"""
+    suggestions = []
+    
+    # Category-based folder mapping
+    folder_map = {
+        'invoice': 'Finance/Invoices',
+        'receipt': 'Finance/Receipts',
+        'contract': 'Legal/Contracts',
+        'resume': 'Career/Resume',
+        'meeting-notes': 'Work/Meetings',
+        'report': 'Work/Reports',
+        'code': 'Projects/Code',
+        'image': 'Media/Images',
+        'document': 'Files'
+    }
+    
+    # Primary suggestion based on category
+    primary_folder = folder_map.get(category, 'Files')
+    full_path = f"{base_directory}/{primary_folder}"
+    
+    suggestions.append({
+        "path": full_path,
+        "confidence": 0.95,
+        "reasoning": f"AI detected content type: {category}. Files of this type belong in {primary_folder}",
+        "category": category
+    })
+    
+    # Entity-based suggestions
+    if entities.get('company') and category in ['invoice', 'receipt', 'contract']:
+        company_folder = f"{base_directory}/{primary_folder}/{entities['company']}"
+        suggestions.append({
+            "path": company_folder,
+            "confidence": 0.90,
+            "reasoning": f"Company-specific organization for {entities['company']} documents",
+            "category": f"{category}-company"
+        })
+    
+    # Date-based suggestions for time-sensitive documents
+    if category in ['invoice', 'receipt', 'report'] and entities.get('deadline'):
+        year = "2024" if "2024" in entities['deadline'] else "2025"
+        date_folder = f"{base_directory}/{primary_folder}/{year}"
+        suggestions.append({
+            "path": date_folder,
+            "confidence": 0.85,
+            "reasoning": f"Date-based organization for {year} documents",
+            "category": f"{category}-date"
+        })
+    
+    return suggestions
+
 async def analyze_file_enhanced(request: FileAnalysisRequest) -> FileAnalysisResponse:
-    """Enhanced file analysis with entity extraction"""
+    """Enhanced file analysis with entity extraction and folder intelligence"""
     
     if not openai_client:
         raise HTTPException(status_code=500, detail="OpenAI not configured")
@@ -490,6 +544,16 @@ async def analyze_file_enhanced(request: FileAnalysisRequest) -> FileAnalysisRes
     
     # Determine category
     category, subcategory = determine_category(content, entities)
+    
+    # Generate folder suggestions if requested
+    folder_suggestions = []
+    if request.include_folder_suggestions:
+        folder_suggestions = generate_folder_suggestions(
+            request.original_name,
+            category,
+            entities,
+            request.base_directory or "/Users/pranjal/Downloads/silentsort-test"
+        )
     
     # Enhanced prompt with entity context and naming examples
     prompt = f"""You are a file naming expert. Create semantic, user-friendly filenames based on content analysis.
@@ -555,6 +619,7 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format:
             content_summary=result.get("contentSummary"),
             technical_tags=technical_tags,
             extracted_entities=ExtractedEntities(**entities),
+            folder_suggestions=folder_suggestions,
             processing_time_ms=0
         )
         
@@ -574,6 +639,7 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format:
             alternatives=[],
             technical_tags=technical_tags,
             extracted_entities=ExtractedEntities(**entities),
+            folder_suggestions=folder_suggestions,
             processing_time_ms=0
         )
         
@@ -592,6 +658,7 @@ IMPORTANT: Respond ONLY with valid JSON in this exact format:
             alternatives=[],
             technical_tags=technical_tags,
             extracted_entities=ExtractedEntities(**entities),
+            folder_suggestions=folder_suggestions,
             processing_time_ms=0
         )
 

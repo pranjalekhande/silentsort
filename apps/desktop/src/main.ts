@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as chokidar from 'chokidar';
 import { aiService } from './services/ai-service';
 import { FileStateManager } from './services/file-state-manager';
+import { FolderIntelligenceService } from './services/folder-intelligence-service';
 
 // Load environment variables from the correct location
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -90,6 +91,7 @@ class SilentSortApp {
   private tray: Tray | null = null;
   private fileWatcher: chokidar.FSWatcher | null = null;
   private fileStateManager: FileStateManager;
+  private folderIntelligenceService: FolderIntelligenceService;
   private processingFiles: Set<string> = new Set(); // Track currently processing files
 
   constructor() {
@@ -98,6 +100,9 @@ class SilentSortApp {
       maxProcessingAttempts: 3,
       contentHashSampleSize: 8192
     });
+    
+    this.folderIntelligenceService = new FolderIntelligenceService();
+    
     this.setupApp();
   }
 
@@ -193,6 +198,9 @@ class SilentSortApp {
     const watchPaths = [watchFolder];
 
     console.log('Setting up file watcher for user folder:', watchPaths);
+
+    // Update folder intelligence service with watched folders
+    this.folderIntelligenceService.setWatchedFolders(watchPaths);
 
     // Close existing watcher if any
     if (this.fileWatcher) {
@@ -292,36 +300,54 @@ class SilentSortApp {
           extractedEntities: aiResult.extracted_entities
         });
 
-        // Get comprehensive file analysis including duplicates
-        const comprehensiveAnalysis = await this.fileStateManager.getFileAnalysis(filePath);
-        
-        // Send enhanced file data to renderer
-        if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
-          this.mainWindow.webContents.send('new-file-detected', {
-            filePath,
-            aiResult: {
-              ...aiResult,
-              // Add duplicate detection info to AI result
-              duplicateInfo: comprehensiveAnalysis.duplicateAnalysis.isDuplicate ? {
-                isDuplicate: true,
-                duplicateFiles: comprehensiveAnalysis.duplicateAnalysis.duplicateFiles,
-                similarFiles: comprehensiveAnalysis.duplicateAnalysis.similarFiles,
-                action: comprehensiveAnalysis.duplicateAnalysis.action,
-                betterVersion: comprehensiveAnalysis.duplicateAnalysis.betterVersion
-              } : undefined,
-              // Add smart tags to AI result
-              smartTags: comprehensiveAnalysis.smartTags.map(tag => tag.tag),
-              // Add folder suggestion to AI result
-              folderSuggestion: comprehensiveAnalysis.folderSuggestion.confidence > 0.5 ? {
-                path: comprehensiveAnalysis.folderSuggestion.suggestedPath,
-                confidence: comprehensiveAnalysis.folderSuggestion.confidence,
-                reasoning: comprehensiveAnalysis.folderSuggestion.reasoning
-              } : undefined
-            },
-            fileHash, // Include hash for tracking
-            comprehensiveAnalysis // Include full analysis for advanced UI features
-          });
-        }
+              // Get comprehensive file analysis including duplicates
+      const comprehensiveAnalysis = await this.fileStateManager.getFileAnalysis(filePath);
+      
+      // Get AI-enhanced folder suggestions using the FolderIntelligenceService
+      let aiFolderSuggestions: any[] = [];
+      try {
+        aiFolderSuggestions = await this.folderIntelligenceService.suggestFolderWithAI(filePath);
+        console.log(`🤖 AI folder suggestions generated: ${aiFolderSuggestions.length} suggestions`);
+      } catch (error) {
+        console.warn('⚠️  AI folder suggestions failed, using basic suggestions:', error instanceof Error ? error.message : 'Unknown error');
+      }
+      
+      // Use AI folder suggestion if available and high confidence, otherwise fallback to basic
+      const bestFolderSuggestion = aiFolderSuggestions.length > 0 && aiFolderSuggestions[0].confidence > 0.7 
+        ? {
+            path: aiFolderSuggestions[0].path,
+            confidence: aiFolderSuggestions[0].confidence,
+            reasoning: aiFolderSuggestions[0].reasoning
+          }
+        : (comprehensiveAnalysis.folderSuggestion.confidence > 0.5 ? {
+            path: comprehensiveAnalysis.folderSuggestion.suggestedPath,
+            confidence: comprehensiveAnalysis.folderSuggestion.confidence,
+            reasoning: comprehensiveAnalysis.folderSuggestion.reasoning
+          } : undefined);
+      
+      // Send enhanced file data to renderer
+      if (this.mainWindow && !this.mainWindow.isDestroyed() && this.mainWindow.webContents && !this.mainWindow.webContents.isDestroyed()) {
+        this.mainWindow.webContents.send('new-file-detected', {
+          filePath,
+          aiResult: {
+            ...aiResult,
+            // Add duplicate detection info to AI result
+            duplicateInfo: comprehensiveAnalysis.duplicateAnalysis.isDuplicate ? {
+              isDuplicate: true,
+              duplicateFiles: comprehensiveAnalysis.duplicateAnalysis.duplicateFiles,
+              similarFiles: comprehensiveAnalysis.duplicateAnalysis.similarFiles,
+              action: comprehensiveAnalysis.duplicateAnalysis.action,
+              betterVersion: comprehensiveAnalysis.duplicateAnalysis.betterVersion
+            } : undefined,
+            // Add smart tags to AI result
+            smartTags: comprehensiveAnalysis.smartTags.map(tag => tag.tag),
+            // Add AI-enhanced folder suggestion to AI result
+            folderSuggestion: bestFolderSuggestion
+          },
+          fileHash, // Include hash for tracking
+          comprehensiveAnalysis // Include full analysis for advanced UI features
+        });
+      }
 
         console.log('📋 Enhanced file processing completed:', fileName);
         
@@ -484,6 +510,33 @@ class SilentSortApp {
 
     ipcMain.handle('is-first-run', async () => {
       return store.get('isFirstRun');
+    });
+
+    // Folder move operations
+    ipcMain.handle('move-file-to-folder', async (event, filePath: string, targetPath: string, createFolder: boolean) => {
+      try {
+        const result = await this.folderIntelligenceService.moveFileToSuggestedFolder(
+          filePath, // The actual file path to move
+          targetPath, // The target folder path
+          createFolder
+        );
+        
+        if (result.success) {
+          return { 
+            success: true, 
+            message: createFolder ? 'Folder created and file moved successfully' : 'File moved successfully', 
+            newPath: result.newPath 
+          };
+        } else {
+          return { 
+            success: false, 
+            message: result.error || 'Failed to move file' 
+          };
+        }
+      } catch (error) {
+        console.error('❌ Exception in move file operation:', error);
+        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+      }
     });
 
     // File preview functionality
