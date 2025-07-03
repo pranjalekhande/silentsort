@@ -66,13 +66,13 @@ const Header: React.FC<HeaderProps> = ({
     <header className="mac-header">
       {/* Title Bar - Mac Chrome Style */}
       <div className="title-bar">
-        <div className="title-bar-left">
+        {/* <div className="title-bar-left">
           <div className="mac-controls">
             <div className="mac-button close"></div>
             <div className="mac-button minimize"></div>
             <div className="mac-button maximize"></div>
           </div>
-        </div>
+        </div> */}
         
         <div className="title-bar-center">
           <div className="app-title">

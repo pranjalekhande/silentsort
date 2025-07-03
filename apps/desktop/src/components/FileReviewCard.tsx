@@ -503,20 +503,23 @@ Processed by SilentSort`,
         )}
         
         <div className="file-content">
-          <div className="file-names">
+          <div className="file-header">
             <span className="file-icon">{getFileIcon(file.originalName, file.category)}</span>
-            <div className="name-row first-row">
+            <div className="file-meta">
+              <span className="category">{file.category}</span>
+              <span className={`confidence confidence-${getConfidenceColor(file.confidence)}`}>
+                {Math.round(file.confidence * 100)}%
+              </span>
+            </div>
+          </div>
+          
+          <div className="file-names">
+            <div className="name-row from-row">
               <span className="label">From:</span>
               <span className="original-name">{file.originalName}</span>
-              <div className="file-meta">
-                <span className="category">{file.category}</span>
-                <span className={`confidence confidence-${getConfidenceColor(file.confidence)}`}>
-                  {Math.round(file.confidence * 100)}%
-                </span>
-              </div>
             </div>
-            <div className="name-row second-row">
-              <span className="label to-label">To:</span>
+            <div className="name-row to-row">
+              <span className="label">To:</span>
               {isEditing ? (
                 <input
                   type="text"
@@ -540,27 +543,30 @@ Processed by SilentSort`,
             </div>
           </div>
           
-          {/* Only show tags and entities in expanded view */}
+          {/* Enhanced expandable sections */}
           {showDetails && (
             <>
-              {keyEntities.length > 0 && (
-                <div className="key-entities">
-                  {keyEntities.map((entity, i) => (
-                    <span key={i} className="entity-tag">{entity}</span>
-                  ))}
+              {(keyEntities.length > 0 || getAllTags().length > 0) && (
+                <div className="tags-section">
+                  {keyEntities.length > 0 && (
+                    <div className="key-entities">
+                      {keyEntities.map((entity, i) => (
+                        <span key={i} className="entity-tag">{entity}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {getAllTags().length > 0 && (
+                    <div className="unified-tags">
+                      {getAllTags().map((tag, i) => (
+                        <span key={i} className="unified-tag">{tag}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Unified tags section */}
-              {getAllTags().length > 0 && (
-                <div className="unified-tags">
-                  {getAllTags().map((tag, i) => (
-                    <span key={i} className="unified-tag">{tag}</span>
-                  ))}
-                </div>
-              )}
-
-              {/* Folder Suggestion Section */}
+              {/* Enhanced Folder Suggestion Section */}
               {file.folderSuggestion && (
                 <div className="folder-suggestion-section">
                   <div 
@@ -610,7 +616,7 @@ Processed by SilentSort`,
             </>
           )}
 
-          {/* Duplicate Information */}
+          {/* Enhanced Duplicate Information */}
           {hasDuplicates && (
             <div className="duplicate-info">
               <div className="duplicate-files">
@@ -622,13 +628,13 @@ Processed by SilentSort`,
                       className="preview-btn-small"
                       onClick={() => onPreviewFile?.(duplicateFile)}
                     >
-                      👁️
+                      👁️ Preview
                     </button>
                   </div>
                 ))}
                 {file.duplicateInfo?.duplicateFiles && file.duplicateInfo.duplicateFiles.length > 2 && (
                   <div className="more-duplicates">
-                    +{file.duplicateInfo.duplicateFiles.length - 2} more files
+                    +{file.duplicateInfo.duplicateFiles.length - 2} more similar files
                   </div>
                 )}
               </div>
